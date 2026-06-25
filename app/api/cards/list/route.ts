@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { getReadableBlobUrl, isAzureBlobUrl } from '@/lib/azure-blob-storage';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +14,6 @@ export async function GET(request: NextRequest) {
     
     const organizationId = (session.user as any).organizationId;
     
-    // Get all cards from the same organization
     const cards = await query(
       `SELECT bc.*, u.name as uploaded_by 
        FROM business_cards bc
@@ -21,9 +21,24 @@ export async function GET(request: NextRequest) {
        WHERE bc.organization_id = ?
        ORDER BY bc.created_at DESC`,
       [organizationId]
+    ) as any[];
+
+    const cardsWithDisplayUrls = await Promise.all(
+      cards.map(async (card) => {
+        if (card.image_url && isAzureBlobUrl(card.image_url)) {
+          return {
+            ...card,
+            image_display_url: await getReadableBlobUrl(card.image_url),
+          };
+        }
+        return {
+          ...card,
+          image_display_url: card.image_url,
+        };
+      })
     );
     
-    return NextResponse.json({ cards });
+    return NextResponse.json({ cards: cardsWithDisplayUrls });
     
   } catch (error: any) {
     console.error('List cards error:', error);

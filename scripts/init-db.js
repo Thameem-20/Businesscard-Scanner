@@ -1,7 +1,16 @@
 const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
+const { loadEnv } = require('./load-env');
 
-const connectionString = process.env.DATABASE_URL || 'mysql://root:@localhost:3306/compassbusinesscard';
+loadEnv();
+
+function getConnectionString() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not set. Add it to your .env file.');
+  }
+  return connectionString;
+}
 
 // Parse connection string
 function parseConnectionString(connectionString) {
@@ -16,7 +25,7 @@ function parseConnectionString(connectionString) {
 }
 
 async function initDatabase() {
-  const config = parseConnectionString(connectionString);
+  const config = parseConnectionString(getConnectionString());
   const baseConfig = { ...config };
   delete baseConfig.database;
 

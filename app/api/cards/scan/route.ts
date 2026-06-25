@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { processBusinessCard } from '@/lib/ocr';
-import { findMatchingCards, checkDuplicateName } from '@/lib/card-matching';
-import { query, queryOne } from '@/lib/db';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { checkDuplicateName } from '@/lib/card-matching';
+import { uploadToBlob, getReadableBlobUrl } from '@/lib/azure-blob-storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,13 +23,6 @@ export async function POST(request: NextRequest) {
     // Process OCR
     const cardData = await processBusinessCard(file);
     
-    if (!cardData.name) {
-      return NextResponse.json({ 
-        error: 'Could not extract name from business card' 
-      }, { status: 400 });
-    }
-    
-    const userId = parseInt((session.user as any).id);
     const organizationId = typeof (session.user as any).organizationId === 'string'
       ? parseInt((session.user as any).organizationId)
       : (session.user as any).organizationId;
@@ -43,23 +33,16 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Save image locally first (needed for both new and update flows)
+    // Upload image to Azure Blob Storage
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-    
-    const filename = `${Date.now()}-${file.name}`;
-    const filepath = join(uploadsDir, filename);
-    await writeFile(filepath, buffer);
-    
-    const imageUrl = `/uploads/${filename}`;
+    const { url: imageUrl, blobName } = await uploadToBlob(buffer, file.name, file.type || 'image/jpeg');
+    const imageDisplayUrl = await getReadableBlobUrl(imageUrl);
     
     // Check for duplicate name (only within the same organization)
-    const duplicate = await checkDuplicateName(cardData.name, organizationId);
+    const duplicate = cardData.name
+      ? await checkDuplicateName(cardData.name, organizationId)
+      : null;
     
     if (duplicate) {
       return NextResponse.json({
@@ -67,6 +50,8 @@ export async function POST(request: NextRequest) {
         matchedCard: duplicate,
         extractedData: cardData,
         imageUrl: imageUrl,
+        imageDisplayUrl: imageDisplayUrl,
+        blobName: blobName,
       }, { status: 200 });
     }
     
@@ -75,6 +60,8 @@ export async function POST(request: NextRequest) {
       success: true,
       extractedData: cardData,
       imageUrl: imageUrl,
+      imageDisplayUrl: imageDisplayUrl,
+      blobName: blobName,
     });
     
   } catch (error: any) {

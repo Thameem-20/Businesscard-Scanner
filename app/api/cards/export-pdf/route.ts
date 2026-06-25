@@ -110,92 +110,100 @@ export async function GET(request: NextRequest) {
       doc.moveDown();
 
       // Process cards - 4 per page in a 2x2 grid
-      cards.forEach((card, index) => {
-        // Add new page if needed (every 4 cards, but not for the first card)
-        if (index > 0 && index % cardsPerPage === 0) {
-          doc.addPage();
-        }
+      void (async () => {
+        for (let index = 0; index < cards.length; index++) {
+          const card = cards[index];
 
-        // Calculate position for this card (2x2 grid)
-        const cardIndexOnPage = index % cardsPerPage;
-        const row = Math.floor(cardIndexOnPage / 2); // 0 or 1
-        const col = cardIndexOnPage % 2; // 0 or 1
-
-        const x = doc.page.margins.left + (col * (cardWidth + 30));
-        const y = doc.page.margins.top + 70 + (row * (cardHeight + 10)); // 70 for title space
-
-        // Save current position
-        const savedX = doc.x;
-        const savedY = doc.y;
-
-        // Move to card position
-        doc.x = x;
-        doc.y = y;
-
-        // Card header (name) - larger font
-        doc.fontSize(16).font('Helvetica-Bold').text(card.name || 'Unknown', {
-          width: cardWidth - 10,
-          ellipsis: true,
-        });
-        doc.moveDown(0.4);
-
-        // Add card image if available - larger size
-        if (card.image_url) {
-          try {
-            const imagePath = path.join(process.cwd(), 'public', card.image_url);
-            
-            if (fs.existsSync(imagePath)) {
-              const imageWidth = cardWidth - 10;
-              const imageHeight = 140; // Increased from 80
-              const imageY = doc.y;
-              
-              // Use x, y coordinates with fit option
-              doc.image(imagePath, x, imageY, {
-                fit: [imageWidth, imageHeight],
-              });
-              // Move cursor down after image
-              doc.y = imageY + imageHeight + 10;
-            }
-          } catch (imageError) {
-            console.error('Error loading image:', imageError);
+          if (index > 0 && index % cardsPerPage === 0) {
+            doc.addPage();
           }
+
+          const cardIndexOnPage = index % cardsPerPage;
+          const row = Math.floor(cardIndexOnPage / 2);
+          const col = cardIndexOnPage % 2;
+
+          const x = doc.page.margins.left + (col * (cardWidth + 30));
+          const y = doc.page.margins.top + 70 + (row * (cardHeight + 10));
+
+          const savedX = doc.x;
+          const savedY = doc.y;
+
+          doc.x = x;
+          doc.y = y;
+
+          doc.fontSize(16).font('Helvetica-Bold').text(card.name || 'Unknown', {
+            width: cardWidth - 10,
+            ellipsis: true,
+          });
+          doc.moveDown(0.4);
+
+          if (card.image_url) {
+            try {
+              let imageBuffer: Buffer | null = null;
+
+              if (card.image_url.startsWith('http://') || card.image_url.startsWith('https://')) {
+                const imageResponse = await fetch(card.image_url);
+                if (imageResponse.ok) {
+                  imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+                }
+              } else {
+                const imagePath = path.join(process.cwd(), 'public', card.image_url);
+                if (fs.existsSync(imagePath)) {
+                  imageBuffer = fs.readFileSync(imagePath);
+                }
+              }
+
+              if (imageBuffer) {
+                const imageWidth = cardWidth - 10;
+                const imageHeight = 140;
+                const imageY = doc.y;
+
+                doc.image(imageBuffer, x, imageY, {
+                  fit: [imageWidth, imageHeight],
+                });
+                doc.y = imageY + imageHeight + 10;
+              }
+            } catch (imageError) {
+              console.error('Error loading image:', imageError);
+            }
+          }
+
+          doc.fontSize(10).font('Helvetica');
+
+          if (card.company) {
+            doc.font('Helvetica-Bold').text('Company: ', { continued: true, width: cardWidth - 10 })
+               .font('Helvetica').text(card.company, { width: cardWidth - 10 });
+          }
+
+          if (card.job_title) {
+            doc.font('Helvetica-Bold').text('Job Title: ', { continued: true, width: cardWidth - 10 })
+               .font('Helvetica').text(card.job_title, { width: cardWidth - 10 });
+          }
+
+          if (card.email) {
+            doc.font('Helvetica-Bold').text('Email: ', { continued: true, width: cardWidth - 10 })
+               .font('Helvetica').text(card.email, { width: cardWidth - 10 });
+          }
+
+          if (card.phone) {
+            doc.font('Helvetica-Bold').text('Phone: ', { continued: true, width: cardWidth - 10 })
+               .font('Helvetica').text(card.phone, { width: cardWidth - 10 });
+          }
+
+          if (card.website) {
+            doc.font('Helvetica-Bold').text('Website: ', { continued: true, width: cardWidth - 10 })
+               .font('Helvetica').text(card.website, { width: cardWidth - 10 });
+          }
+
+          doc.x = savedX;
+          doc.y = savedY;
         }
 
-        // Card details - larger font
-        doc.fontSize(10).font('Helvetica');
-        
-        if (card.company) {
-          doc.font('Helvetica-Bold').text('Company: ', { continued: true, width: cardWidth - 10 })
-             .font('Helvetica').text(card.company, { width: cardWidth - 10 });
-        }
-        
-        if (card.job_title) {
-          doc.font('Helvetica-Bold').text('Job Title: ', { continued: true, width: cardWidth - 10 })
-             .font('Helvetica').text(card.job_title, { width: cardWidth - 10 });
-        }
-        
-        if (card.email) {
-          doc.font('Helvetica-Bold').text('Email: ', { continued: true, width: cardWidth - 10 })
-             .font('Helvetica').text(card.email, { width: cardWidth - 10 });
-        }
-        
-        if (card.phone) {
-          doc.font('Helvetica-Bold').text('Phone: ', { continued: true, width: cardWidth - 10 })
-             .font('Helvetica').text(card.phone, { width: cardWidth - 10 });
-        }
-        
-        if (card.website) {
-          doc.font('Helvetica-Bold').text('Website: ', { continued: true, width: cardWidth - 10 })
-             .font('Helvetica').text(card.website, { width: cardWidth - 10 });
-        }
-
-        // Restore position for next card
-        doc.x = savedX;
-        doc.y = savedY;
+        doc.end();
+      })().catch((error) => {
+        console.error('Export PDF generation error:', error);
+        reject(new NextResponse(JSON.stringify({ error: 'Failed to generate PDF' }), { status: 500 }));
       });
-
-      // End the document
-      doc.end();
     });
     
   } catch (error: any) {

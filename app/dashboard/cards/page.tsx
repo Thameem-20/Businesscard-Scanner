@@ -4,8 +4,9 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CreditCard, Search, Edit, Trash2, X, Phone, Mail, Building2, MapPin, Globe, ChevronRight, Save } from 'lucide-react';
+import { CreditCard, Search, Edit, Trash2, X, Phone, Mail, Building2, Globe, ChevronRight, Save, User, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CardImage } from '@/components/card-image';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ interface BusinessCard {
   address?: string;
   website?: string;
   image_url?: string;
+  image_display_url?: string;
   created_at: string;
   uploaded_by: string;
 }
@@ -207,19 +209,14 @@ export default function CardsPage() {
                   onClick={() => handleCardClick(card)}
                   className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center gap-4 active:bg-gray-50 cursor-pointer"
                 >
-                  {card.image_url ? (
-                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                      <img
-                        src={card.image_url}
-                        alt={card.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-16 h-16 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="h-8 w-8 text-indigo-600" />
-                    </div>
-                  )}
+                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                    <CardImage
+                      src={card.image_display_url || card.image_url}
+                      alt={card.name}
+                      className="w-full h-full object-cover"
+                      fallbackClassName="w-full h-full bg-indigo-100 flex items-center justify-center"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{card.name}</h3>
                     {card.company && (
@@ -242,19 +239,14 @@ export default function CardsPage() {
                   onClick={() => handleCardClick(card)}
                   className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center gap-4 hover:bg-gray-50 cursor-pointer transition-colors"
                 >
-                  {card.image_url ? (
-                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                      <img
-                        src={card.image_url}
-                        alt={card.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-16 h-16 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="h-8 w-8 text-indigo-600" />
-                    </div>
-                  )}
+                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                    <CardImage
+                      src={card.image_display_url || card.image_url}
+                      alt={card.name}
+                      className="w-full h-full object-cover"
+                      fallbackClassName="w-full h-full bg-indigo-100 flex items-center justify-center"
+                    />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{card.name}</h3>
                     {card.company && (
@@ -274,34 +266,31 @@ export default function CardsPage() {
 
       {/* Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl h-[100dvh] md:h-auto md:max-h-[90vh] overflow-y-auto md:overflow-y-auto p-4 md:p-6 fixed top-0 left-0 md:left-[50%] md:top-[50%] translate-x-0 md:translate-x-[-50%] translate-y-0 md:translate-y-[-50%] rounded-none md:rounded-lg w-full md:w-full">
-          <DialogHeader className="pr-8 md:pr-0 pb-2 md:pb-4">
+        <DialogContent className="max-w-2xl h-[100dvh] md:h-auto md:max-h-[90vh] overflow-hidden p-3 md:p-5 fixed top-0 left-0 md:left-[50%] md:top-[50%] translate-x-0 md:translate-x-[-50%] translate-y-0 md:translate-y-[-50%] rounded-none md:rounded-xl w-full flex flex-col">
+          <DialogHeader className="pr-8 md:pr-0 pb-2 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
-              <DialogTitle className="flex-1 text-base md:text-lg">Business Card Details</DialogTitle>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {!isEditing && (
+              <DialogTitle className="text-base font-semibold">Card Details</DialogTitle>
+              <div className="flex items-center gap-1">
+                {!isEditing ? (
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={handleEdit}
-                    className="flex items-center gap-2 h-8 md:h-9"
+                    className="h-8 w-8"
                   >
                     <Edit className="h-4 w-4" />
-                    <span className="hidden sm:inline">Edit</span>
                   </Button>
-                )}
-                {isEditing && (
+                ) : (
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => {
                       setIsEditing(false);
                       setEditFormData(selectedCard || {});
                     }}
-                    className="flex items-center gap-2 h-8 md:h-9"
+                    className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
                   >
                     <X className="h-4 w-4" />
-                    <span className="hidden sm:inline">Cancel</span>
                   </Button>
                 )}
               </div>
@@ -309,159 +298,186 @@ export default function CardsPage() {
           </DialogHeader>
 
           {selectedCard && (
-            <div className="space-y-3 md:space-y-6">
+            <div className="flex flex-col flex-1 min-h-0 gap-2">
+              {/* Card Image */}
               {selectedCard.image_url && (
                 <div 
-                  className="w-full h-52 md:h-64 bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                  className="w-full h-56 md:h-60 bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-95 transition-opacity border border-gray-200 flex-shrink-0"
                   onClick={() => setIsImageViewerOpen(true)}
                 >
-                  <img
-                    src={selectedCard.image_url}
+                  <CardImage
+                    src={selectedCard.image_display_url || selectedCard.image_url}
                     alt={selectedCard.name}
                     className="w-full h-full object-cover"
                   />
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                <div>
-                  <label className="text-xs md:text-sm font-medium text-gray-700 block mb-1 md:mb-2">Full name:</label>
+              {/* Contact Info - Single Column */}
+              <div className="space-y-2 flex-1 overflow-y-auto">
+                {/* Name */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <User className="h-3 w-3" />
+                    Name
+                  </label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={editFormData.name || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                      className="w-full px-2 md:px-3 py-1.5 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
                   ) : (
-                    <p className="text-sm md:text-base text-gray-900">{selectedCard.name || 'N/A'}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{selectedCard.name || 'N/A'}</p>
                   )}
                 </div>
 
-                <div>
-                  <label className="text-xs md:text-sm font-medium text-gray-700 block mb-1 md:mb-2 flex items-center gap-2">
-                    <Building2 className="h-3 w-3 md:h-4 md:w-4" />
-                    Company:
+                {/* Company */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <Building2 className="h-3 w-3" />
+                    Company
                   </label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={editFormData.company || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value })}
-                      className="w-full px-2 md:px-3 py-1.5 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
                   ) : (
-                    <p className="text-sm md:text-base text-gray-900">{selectedCard.company || 'N/A'}</p>
+                    <p className="text-sm text-gray-900 truncate">{selectedCard.company || 'N/A'}</p>
                   )}
                 </div>
 
-                <div>
-                  <label className="text-xs md:text-sm font-medium text-gray-700 block mb-1 md:mb-2">Job Title:</label>
+                {/* Job Title */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <Briefcase className="h-3 w-3" />
+                    Title
+                  </label>
                   {isEditing ? (
                     <input
                       type="text"
                       value={editFormData.job_title || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, job_title: e.target.value })}
-                      className="w-full px-2 md:px-3 py-1.5 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
                   ) : (
-                    <p className="text-sm md:text-base text-gray-900">{selectedCard.job_title || 'N/A'}</p>
+                    <p className="text-sm text-gray-900 truncate">{selectedCard.job_title || 'N/A'}</p>
                   )}
                 </div>
 
-                <div>
-                  <label className="text-xs md:text-sm font-medium text-gray-700 block mb-1 md:mb-2 flex items-center gap-2">
-                    <Phone className="h-3 w-3 md:h-4 md:w-4" />
-                    Phone:
+                {/* Phone */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <Phone className="h-3 w-3" />
+                    Phone
                   </label>
                   {isEditing ? (
                     <input
                       type="tel"
                       value={editFormData.phone || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                      className="w-full px-2 md:px-3 py-1.5 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
+                  ) : selectedCard.phone ? (
+                    <a href={`tel:${selectedCard.phone}`} className="text-sm no-underline flex items-center justify-between" style={{ color: '#111827' }}>
+                      <span className="truncate">{selectedCard.phone}</span>
+                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400" />
+                    </a>
                   ) : (
-                    <p className="text-sm md:text-base text-gray-900">{selectedCard.phone || 'N/A'}</p>
+                    <p className="text-sm text-gray-900">N/A</p>
                   )}
                 </div>
 
-                <div>
-                  <label className="text-xs md:text-sm font-medium text-gray-700 block mb-1 md:mb-2 flex items-center gap-2">
-                    <Mail className="h-3 w-3 md:h-4 md:w-4" />
-                    Email:
+                {/* Email */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <Mail className="h-3 w-3" />
+                    Email
                   </label>
                   {isEditing ? (
                     <input
                       type="email"
                       value={editFormData.email || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                      className="w-full px-2 md:px-3 py-1.5 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
+                  ) : selectedCard.email ? (
+                    <a href={`mailto:${selectedCard.email}`} className="text-sm no-underline flex items-center justify-between" style={{ color: '#111827' }}>
+                      <span className="truncate">{selectedCard.email}</span>
+                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400" />
+                    </a>
                   ) : (
-                    <p className="text-sm md:text-base text-gray-900 break-all">{selectedCard.email || 'N/A'}</p>
+                    <p className="text-sm text-gray-900">N/A</p>
                   )}
                 </div>
 
-                <div>
-                  <label className="text-xs md:text-sm font-medium text-gray-700 block mb-1 md:mb-2 flex items-center gap-2">
-                    <Globe className="h-3 w-3 md:h-4 md:w-4" />
-                    Website:
+                {/* Website */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <Globe className="h-3 w-3" />
+                    Website
                   </label>
                   {isEditing ? (
                     <input
                       type="url"
                       value={editFormData.website || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
-                      className="w-full px-2 md:px-3 py-1.5 md:py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                     />
                   ) : selectedCard.website ? (
-                    <a
+                    <a 
                       href={selectedCard.website.startsWith('http') ? selectedCard.website : `https://${selectedCard.website}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm md:text-base text-indigo-600 hover:underline break-all"
+                      className="text-sm no-underline flex items-center justify-between"
+                      style={{ color: '#111827' }}
                     >
-                      {selectedCard.website}
+                      <span className="truncate">{selectedCard.website}</span>
+                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400" />
                     </a>
                   ) : (
-                    <p className="text-sm md:text-base text-gray-900">N/A</p>
+                    <p className="text-sm text-gray-900">N/A</p>
                   )}
                 </div>
-
               </div>
 
-              {isEditing && (
-                <div className="flex justify-end gap-2 pt-3 md:pt-4 border-t">
+              {/* Footer - pushed to bottom */}
+              <div className="mt-auto flex-shrink-0 space-y-2" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                {/* Save Button (Edit Mode) */}
+                {isEditing && (
                   <Button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="flex items-center gap-2 text-sm md:text-base py-1.5 md:py-2"
+                    className="w-full h-10 bg-indigo-600 hover:bg-indigo-700"
                   >
-                    <Save className="h-3 w-3 md:h-4 md:w-4" />
+                    <Save className="h-4 w-4 mr-2" />
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
+                )}
+
+                {/* Footer Info */}
+                <div className="flex items-center justify-between text-[10px] text-gray-400 px-1">
+                  <span>Added by {selectedCard.uploaded_by}</span>
+                  <span>{new Date(selectedCard.created_at).toLocaleDateString()}</span>
                 </div>
-              )}
 
-              <div className="pt-2 md:pt-4 border-t text-xs text-gray-500">
-                <p>Uploaded by: {selectedCard.uploaded_by}</p>
-                <p>Date: {new Date(selectedCard.created_at).toLocaleDateString()}</p>
-              </div>
-
-              {!isEditing && (
-                <div className="pt-3 md:pt-4 border-t">
+                {/* Delete Button */}
+                {!isEditing && (
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="w-full flex items-center justify-center gap-2 text-sm md:text-base py-2 md:py-2"
+                    className="w-full h-10 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
                   >
-                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                    <Trash2 className="h-4 w-4 mr-2" />
                     {isDeleting ? 'Deleting...' : 'Delete Card'}
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
@@ -481,8 +497,8 @@ export default function CardsPage() {
                 <X className="h-5 w-5 md:h-6 md:w-6" />
                 <span className="sr-only">Close</span>
               </Button>
-              <img
-                src={selectedCard.image_url}
+              <CardImage
+                src={selectedCard.image_display_url || selectedCard.image_url}
                 alt={selectedCard.name}
                 className="max-w-full max-h-full object-contain"
               />

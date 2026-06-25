@@ -28,7 +28,7 @@ export function DashboardTopbar() {
   const pageTitle = pageTitles[pathname] || 'Dashboard';
 
   return (
-    <header className="fixed md:sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm">
+    <header className="fixed md:sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-16 items-center justify-between px-4 md:px-6">
         {/* Left side - Logo/Title for mobile, empty on desktop (sidebar has logo) */}
         <div className="flex items-center space-x-3 md:hidden">
