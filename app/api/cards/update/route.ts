@@ -3,6 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
 
+async function getUserScanCountry(userId: number): Promise<string | null> {
+  const users = await query(
+    'SELECT scan_country FROM users WHERE id = ?',
+    [userId]
+  ) as { scan_country: string | null }[];
+
+  const country = users[0]?.scan_country;
+  return country?.trim() ? country : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,10 +28,12 @@ export async function POST(request: NextRequest) {
     const organizationId = (session.user as any).organizationId;
     
     if (createNew && cardData) {
+      const scanCountry = await getUserScanCountry(userId);
+
       const result = await query(
         `INSERT INTO business_cards 
-         (user_id, organization_id, name, company, job_title, email, phone, address, website, image_url, cloud_storage_url, raw_text)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, organization_id, name, company, job_title, email, phone, address, country, website, image_url, cloud_storage_url, raw_text)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
           organizationId,
@@ -31,6 +43,7 @@ export async function POST(request: NextRequest) {
           cardData.email || null,
           cardData.phone || null,
           cardData.address || null,
+          scanCountry,
           cardData.website || null,
           imageUrl || null,
           blobName || null,

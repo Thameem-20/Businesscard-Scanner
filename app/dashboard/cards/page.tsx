@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CreditCard, Search, Edit, Trash2, X, Phone, Mail, Building2, Globe, ChevronRight, Save, User, Briefcase } from 'lucide-react';
+import { CreditCard, Search, Edit, Trash2, X, Phone, Mail, Building2, Globe, ChevronRight, Save, User, Briefcase, MapPin, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardImage } from '@/components/card-image';
 import {
@@ -23,6 +23,7 @@ interface BusinessCard {
   email?: string;
   phone?: string;
   address?: string;
+  country?: string;
   website?: string;
   image_url?: string;
   image_display_url?: string;
@@ -36,6 +37,7 @@ export default function CardsPage() {
   const [cards, setCards] = useState<BusinessCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
   const [selectedCard, setSelectedCard] = useState<BusinessCard | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -158,13 +160,23 @@ export default function CardsPage() {
 
   const filteredCards = cards.filter((card) => {
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       card.name.toLowerCase().includes(searchLower) ||
       card.company?.toLowerCase().includes(searchLower) ||
       card.email?.toLowerCase().includes(searchLower) ||
-      card.phone?.includes(searchTerm)
-    );
+      card.phone?.includes(searchTerm) ||
+      card.address?.toLowerCase().includes(searchLower);
+
+    const matchesCountry =
+      !countryFilter ||
+      (countryFilter === '__uncategorized__' ? !card.country : card.country === countryFilter);
+
+    return matchesSearch && matchesCountry;
   });
+
+  const availableCountries = Array.from(
+    new Set(cards.map((card) => card.country).filter(Boolean) as string[])
+  ).sort();
 
   return (
     <div className="p-4 md:p-6 lg:p-8 h-full w-full">
@@ -174,8 +186,8 @@ export default function CardsPage() {
           <p className="text-gray-600">View and manage all business cards in your organization</p>
         </div>
 
-        <div className="mb-6">
-          <div className="relative">
+        <div className="mb-6 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
@@ -185,17 +197,30 @@ export default function CardsPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
+          <select
+            value={countryFilter}
+            onChange={(e) => setCountryFilter(e.target.value)}
+            className="w-full sm:w-56 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+          >
+            <option value="">All countries</option>
+            <option value="__uncategorized__">Uncategorized</option>
+            {availableCountries.map((country) => (
+              <option key={country} value={country}>
+                {country}
+              </option>
+            ))}
+          </select>
         </div>
 
         {filteredCards.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchTerm ? 'No cards found' : 'No business cards yet'}
+              {searchTerm || countryFilter ? 'No cards found' : 'No business cards yet'}
             </h3>
             <p className="text-gray-600 mb-4">
-              {searchTerm
-                ? 'Try adjusting your search terms'
+              {searchTerm || countryFilter
+                ? 'Try adjusting your search or country filter'
                 : 'No business cards found in your organization'}
             </p>
           </div>
@@ -224,6 +249,9 @@ export default function CardsPage() {
                     )}
                     {card.job_title && (
                       <p className="text-xs text-gray-500 truncate">{card.job_title}</p>
+                    )}
+                    {card.country && (
+                      <p className="text-xs text-indigo-600 truncate">{card.country}</p>
                     )}
                   </div>
                   <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -254,6 +282,9 @@ export default function CardsPage() {
                     )}
                     {card.job_title && (
                       <p className="text-xs text-gray-500 truncate">{card.job_title}</p>
+                    )}
+                    {card.country && (
+                      <p className="text-xs text-indigo-600 truncate">{card.country}</p>
                     )}
                   </div>
                   <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -413,6 +444,44 @@ export default function CardsPage() {
                   ) : (
                     <p className="text-sm text-gray-900">N/A</p>
                   )}
+                </div>
+
+                {/* Address */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <MapPin className="h-3 w-3" />
+                    Address
+                  </label>
+                  {isEditing ? (
+                    <textarea
+                      value={editFormData.address || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                      rows={2}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white resize-none"
+                    />
+                  ) : selectedCard.address ? (
+                    <a
+                      href={`https://maps.google.com/?q=${encodeURIComponent(selectedCard.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm no-underline flex items-start justify-between gap-2"
+                      style={{ color: '#111827' }}
+                    >
+                      <span className="whitespace-pre-wrap">{selectedCard.address}</span>
+                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400 mt-0.5" />
+                    </a>
+                  ) : (
+                    <p className="text-sm text-gray-900">N/A</p>
+                  )}
+                </div>
+
+                {/* Country */}
+                <div className="bg-gray-50 rounded-lg p-2.5">
+                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <Flag className="h-3 w-3" />
+                    Country
+                  </label>
+                  <p className="text-sm text-gray-900">{selectedCard.country || 'Uncategorized'}</p>
                 </div>
 
                 {/* Website */}

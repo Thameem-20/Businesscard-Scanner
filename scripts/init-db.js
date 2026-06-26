@@ -55,6 +55,7 @@ async function initDatabase() {
         name VARCHAR(255) NOT NULL,
         role ENUM('admin', 'user') DEFAULT 'user',
         organization_id INT,
+        scan_country VARCHAR(100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
@@ -74,6 +75,7 @@ async function initDatabase() {
         email VARCHAR(255),
         phone VARCHAR(50),
         address TEXT,
+        country VARCHAR(100),
         website VARCHAR(255),
         image_url VARCHAR(500),
         cloud_storage_url VARCHAR(500),
@@ -86,7 +88,8 @@ async function initDatabase() {
         INDEX idx_org_id (organization_id),
         INDEX idx_name (name),
         INDEX idx_email (email),
-        INDEX idx_phone (phone)
+        INDEX idx_phone (phone),
+        INDEX idx_country (country)
       )
     `);
 

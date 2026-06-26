@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:https": "node server.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "db:init": "node scripts/init-db.js",
     "db:reset-admin": "node scripts/reset-admin-password.js",
-    "generate-icons": "node scripts/generate-icons.js"
+    "generate-icons": "node scripts/generate-icons.js",
+    "db:migrate-country": "node scripts/migrate-add-country.js"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.32.0",

@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Lock, Key, AlertCircle, CheckCircle, Download } from 'lucide-react';
+import { User, Lock, Key, AlertCircle, CheckCircle, Download, Globe } from 'lucide-react';
+import { COUNTRIES } from '@/lib/countries';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -25,10 +26,61 @@ export default function SettingsPage() {
   const [crmEndpoint, setCrmEndpoint] = useState('');
   const [integrationsSuccess, setIntegrationsSuccess] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [scanCountry, setScanCountry] = useState('');
+  const [scanCountryLoading, setScanCountryLoading] = useState(true);
+  const [scanCountrySaving, setScanCountrySaving] = useState(false);
+  const [scanCountrySuccess, setScanCountrySuccess] = useState('');
+
+  const fetchScanCountry = async () => {
+    try {
+      const response = await fetch('/api/settings/scan-country');
+      const data = await response.json();
+      if (response.ok) {
+        setScanCountry(data.scanCountry || '');
+      }
+    } catch (err) {
+      console.error('Failed to fetch scan country:', err);
+    } finally {
+      setScanCountryLoading(false);
+    }
+  };
+
+  const handleSaveScanCountry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setScanCountrySaving(true);
+    setScanCountrySuccess('');
+    setError('');
+
+    try {
+      const response = await fetch('/api/settings/scan-country', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanCountry }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save scan country');
+      }
+
+      setScanCountrySuccess(
+        scanCountry
+          ? `New cards will be tagged as ${scanCountry}.`
+          : 'Scan country cleared. New cards will not be categorized by country.'
+      );
+      setTimeout(() => setScanCountrySuccess(''), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save scan country');
+    } finally {
+      setScanCountrySaving(false);
+    }
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
+    } else if (status === 'authenticated') {
+      fetchScanCountry();
     }
   }, [status, router]);
 
@@ -187,6 +239,55 @@ export default function SettingsPage() {
                 className="bg-gray-50 capitalize"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Scan Country */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Scan Country
+            </CardTitle>
+            <CardDescription>
+              Set the country for new business cards you scan. Cards will be categorized under this country.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSaveScanCountry} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  Country
+                </label>
+                <select
+                  value={scanCountry}
+                  onChange={(e) => setScanCountry(e.target.value)}
+                  disabled={scanCountryLoading}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                >
+                  <option value="">No country (uncategorized)</option>
+                  {COUNTRIES.map((country) => (
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-2">
+                  Change this before scanning when you are collecting cards from a different country.
+                </p>
+              </div>
+
+              {scanCountrySuccess && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                  <CheckCircle className="text-green-600 h-4 w-4 flex-shrink-0" />
+                  <p className="text-green-700 text-sm">{scanCountrySuccess}</p>
+                </div>
+              )}
+
+              <Button type="submit" disabled={scanCountrySaving || scanCountryLoading} className="w-full md:w-auto">
+                {scanCountrySaving ? 'Saving...' : 'Save Scan Country'}
+              </Button>
+            </form>
           </CardContent>
         </Card>
 

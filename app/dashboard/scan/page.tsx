@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, CheckCircle, AlertCircle, Camera, Building2, Phone, Mail, Globe, Save, FileWarning, PenLine } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, Camera, Building2, Phone, Mail, Globe, Save, FileWarning, PenLine, MapPin, Flag } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -47,11 +47,19 @@ export default function ScanPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [extractionFailed, setExtractionFailed] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ imageUrl: string; blobName: string } | null>(null);
+  const [scanCountry, setScanCountry] = useState('');
+
+  useEffect(() => {
+    fetch('/api/settings/scan-country')
+      .then((res) => res.json())
+      .then((data) => setScanCountry(data.scanCountry || ''))
+      .catch(() => {});
+  }, []);
 
   // Check if extraction has meaningful data
   const hasExtractedData = (data: ExtractedData | null): boolean => {
     if (!data) return false;
-    return !!(data.name || data.company || data.email || data.phone || data.jobTitle || data.website);
+    return !!(data.name || data.company || data.email || data.phone || data.jobTitle || data.website || data.address);
   };
 
   // Handle manual entry
@@ -64,6 +72,7 @@ export default function ScanPage() {
       jobTitle: '', 
       email: '', 
       phone: '', 
+      address: '',
       website: '', 
       rawText: '',
       ...(pendingImage ? { imageUrl: pendingImage.imageUrl, blobName: pendingImage.blobName } : {})
@@ -314,6 +323,16 @@ export default function ScanPage() {
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Scan Business Card</h1>
           <p className="text-gray-600">Upload an image or capture a photo of a business card</p>
+          {scanCountry ? (
+            <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-1.5">
+              <Flag className="h-4 w-4" />
+              Cards will be saved under: {scanCountry}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
+              No scan country set. Set one in Settings to categorize cards by country.
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -558,6 +577,18 @@ export default function ScanPage() {
                       value={editFormData.email || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700 block mb-2 flex items-center gap-2">
+                      <MapPin className="h-4 w-4" /> Address:
+                    </label>
+                    <textarea
+                      value={editFormData.address || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white resize-none"
                     />
                   </div>
 
