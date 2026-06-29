@@ -107,8 +107,23 @@ export default function CapturePage() {
 
   const requestCameraStream = useCallback(async (mode: 'environment' | 'user') => {
     const attempts: MediaStreamConstraints[] = [
+      {
+        video: {
+          facingMode: mode,
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
+        },
+        audio: false,
+      },
+      {
+        video: {
+          facingMode: mode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      },
       { video: { facingMode: mode }, audio: false },
-      { video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
       { video: true, audio: false },
     ];
 
@@ -262,10 +277,24 @@ export default function CapturePage() {
     const sourceWidth = FRAME_WIDTH * scaleX;
     const sourceHeight = FRAME_HEIGHT * scaleY;
 
-    const outputWidth = Math.min(sourceWidth, 1280);
-    const outputHeight = Math.min(sourceHeight, 800);
+    const MAX_OUTPUT_WIDTH = 3200;
+    const MAX_OUTPUT_HEIGHT = 2400;
+    let outputWidth = Math.round(sourceWidth);
+    let outputHeight = Math.round(sourceHeight);
+
+    if (outputWidth > MAX_OUTPUT_WIDTH) {
+      outputHeight = Math.round(outputHeight * (MAX_OUTPUT_WIDTH / outputWidth));
+      outputWidth = MAX_OUTPUT_WIDTH;
+    }
+    if (outputHeight > MAX_OUTPUT_HEIGHT) {
+      outputWidth = Math.round(outputWidth * (MAX_OUTPUT_HEIGHT / outputHeight));
+      outputHeight = MAX_OUTPUT_HEIGHT;
+    }
+
     canvas.width = outputWidth;
     canvas.height = outputHeight;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
 
     context.drawImage(
       video,
@@ -311,7 +340,7 @@ export default function CapturePage() {
         setIsCapturing(false);
         setIsProcessing(false);
       }
-    }, 'image/jpeg', 0.92);
+    }, 'image/jpeg', 0.97);
   }, [isCapturing, isProcessing, router, stopCamera]);
 
   const isIOS = isIOSDevice();
