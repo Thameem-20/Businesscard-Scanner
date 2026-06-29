@@ -88,3 +88,48 @@ export async function deleteFromBlob(imageUrl: string): Promise<boolean> {
 
   return deleteBlobByName(blobName);
 }
+
+export async function downloadBlobAsBuffer(blobName: string): Promise<Buffer> {
+  const client = getBlobServiceClient();
+  const blobClient = client
+    .getContainerClient(getContainerName())
+    .getBlockBlobClient(blobName);
+
+  return blobClient.downloadToBuffer();
+}
+
+export async function getCardImageBuffer(card: {
+  image_url?: string | null;
+  cloud_storage_url?: string | null;
+}): Promise<Buffer | null> {
+  if (card.cloud_storage_url) {
+    try {
+      return await downloadBlobAsBuffer(card.cloud_storage_url);
+    } catch (error) {
+      console.error('Failed to download blob by name:', card.cloud_storage_url, error);
+    }
+  }
+
+  if (card.image_url && isAzureBlobUrl(card.image_url)) {
+    const blobName = getBlobNameFromUrl(card.image_url);
+    if (blobName) {
+      try {
+        return await downloadBlobAsBuffer(blobName);
+      } catch (error) {
+        console.error('Failed to download blob from image URL:', card.image_url, error);
+      }
+    }
+
+    try {
+      const readableUrl = await getReadableBlobUrl(card.image_url);
+      const response = await fetch(readableUrl);
+      if (response.ok) {
+        return Buffer.from(await response.arrayBuffer());
+      }
+    } catch (error) {
+      console.error('Failed to fetch image via SAS URL:', card.image_url, error);
+    }
+  }
+
+  return null;
+}

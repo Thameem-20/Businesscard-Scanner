@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { getCardImageBuffer } from '@/lib/azure-blob-storage';
 import fs from 'fs';
 import path from 'path';
 
@@ -137,16 +138,13 @@ export async function GET(request: NextRequest) {
           });
           doc.moveDown(0.4);
 
-          if (card.image_url) {
+          if (card.image_url || card.cloud_storage_url) {
             try {
               let imageBuffer: Buffer | null = null;
 
-              if (card.image_url.startsWith('http://') || card.image_url.startsWith('https://')) {
-                const imageResponse = await fetch(card.image_url);
-                if (imageResponse.ok) {
-                  imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-                }
-              } else {
+              imageBuffer = await getCardImageBuffer(card);
+
+              if (!imageBuffer && card.image_url && !card.image_url.startsWith('http://') && !card.image_url.startsWith('https://')) {
                 const imagePath = path.join(process.cwd(), 'public', card.image_url);
                 if (fs.existsSync(imagePath)) {
                   imageBuffer = fs.readFileSync(imagePath);
