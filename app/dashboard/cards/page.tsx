@@ -202,7 +202,7 @@ export default function CardsPage() {
             onChange={(e) => setCountryFilter(e.target.value)}
             className="w-full sm:w-56 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
           >
-            <option value="">All countries</option>
+            <option value="">All countries / networks</option>
             <option value="__uncategorized__">Uncategorized</option>
             {availableCountries.map((country) => (
               <option key={country} value={country}>

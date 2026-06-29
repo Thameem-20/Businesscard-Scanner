@@ -42,8 +42,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const scanCountry = typeof body.scanCountry === 'string' ? body.scanCountry.trim() : '';
 
-    if (scanCountry && !COUNTRIES.includes(scanCountry as any)) {
-      return NextResponse.json({ error: 'Invalid country selected' }, { status: 400 });
+    if (scanCountry.length > 100) {
+      return NextResponse.json(
+        { error: 'Country or network name must be 100 characters or less' },
+        { status: 400 }
+      );
     }
 
     const userId = parseInt((session.user as any).id);

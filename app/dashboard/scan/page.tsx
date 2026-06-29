@@ -330,7 +330,7 @@ export default function ScanPage() {
             </p>
           ) : (
             <p className="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
-              No scan country set. Set one in Settings to categorize cards by country.
+              No scan country set. Set one in Settings to categorize cards (country or network like WCA).
             </p>
           )}
         </div>

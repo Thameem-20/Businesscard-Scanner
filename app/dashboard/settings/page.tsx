@@ -27,16 +27,31 @@ export default function SettingsPage() {
   const [integrationsSuccess, setIntegrationsSuccess] = useState('');
   const [exporting, setExporting] = useState(false);
   const [scanCountry, setScanCountry] = useState('');
+  const [countrySelect, setCountrySelect] = useState('');
+  const [customCountry, setCustomCountry] = useState('');
   const [scanCountryLoading, setScanCountryLoading] = useState(true);
   const [scanCountrySaving, setScanCountrySaving] = useState(false);
   const [scanCountrySuccess, setScanCountrySuccess] = useState('');
+  const [scanCountryError, setScanCountryError] = useState('');
 
   const fetchScanCountry = async () => {
     try {
       const response = await fetch('/api/settings/scan-country');
       const data = await response.json();
       if (response.ok) {
-        setScanCountry(data.scanCountry || '');
+        const saved = data.scanCountry || '';
+        setScanCountry(saved);
+
+        if (!saved) {
+          setCountrySelect('');
+          setCustomCountry('');
+        } else if (COUNTRIES.includes(saved as (typeof COUNTRIES)[number])) {
+          setCountrySelect(saved);
+          setCustomCountry('');
+        } else {
+          setCountrySelect('__custom__');
+          setCustomCountry(saved);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch scan country:', err);
@@ -49,13 +64,22 @@ export default function SettingsPage() {
     e.preventDefault();
     setScanCountrySaving(true);
     setScanCountrySuccess('');
-    setError('');
+    setScanCountryError('');
+
+    const valueToSave =
+      countrySelect === '__custom__' ? customCountry.trim() : countrySelect;
+
+    if (countrySelect === '__custom__' && !valueToSave) {
+      setScanCountryError('Enter a custom country or network name');
+      setScanCountrySaving(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/settings/scan-country', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scanCountry }),
+        body: JSON.stringify({ scanCountry: valueToSave }),
       });
 
       const data = await response.json();
@@ -63,14 +87,16 @@ export default function SettingsPage() {
         throw new Error(data.error || 'Failed to save scan country');
       }
 
+      setScanCountry(valueToSave);
+
       setScanCountrySuccess(
-        scanCountry
-          ? `New cards will be tagged as ${scanCountry}.`
-          : 'Scan country cleared. New cards will not be categorized by country.'
+        valueToSave
+          ? `New cards will be tagged as ${valueToSave}.`
+          : 'Scan country cleared. New cards will not be categorized.'
       );
       setTimeout(() => setScanCountrySuccess(''), 4000);
     } catch (err: any) {
-      setError(err.message || 'Failed to save scan country');
+      setScanCountryError(err.message || 'Failed to save scan country');
     } finally {
       setScanCountrySaving(false);
     }
@@ -250,18 +276,18 @@ export default function SettingsPage() {
               Scan Country
             </CardTitle>
             <CardDescription>
-              Set the country for new business cards you scan. Cards will be categorized under this country.
+              Set the country or network for new cards you scan (e.g. Saudi Arabia, WCA).
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSaveScanCountry} className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-2">
-                  Country
+                  Country / Network
                 </label>
                 <select
-                  value={scanCountry}
-                  onChange={(e) => setScanCountry(e.target.value)}
+                  value={countrySelect}
+                  onChange={(e) => setCountrySelect(e.target.value)}
                   disabled={scanCountryLoading}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                 >
@@ -271,11 +297,36 @@ export default function SettingsPage() {
                       {country}
                     </option>
                   ))}
+                  <option value="__custom__">Custom (enter manually)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-2">
-                  Change this before scanning when you are collecting cards from a different country.
-                </p>
               </div>
+
+              {countrySelect === '__custom__' && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-2">
+                    Custom name
+                  </label>
+                  <Input
+                    type="text"
+                    value={customCountry}
+                    onChange={(e) => setCustomCountry(e.target.value)}
+                    placeholder="e.g. WCA, GLN, Saudi Arabia"
+                    maxLength={100}
+                    disabled={scanCountryLoading}
+                  />
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500">
+                Change this before scanning when collecting cards from a different country or network.
+              </p>
+
+              {scanCountryError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                  <AlertCircle className="text-red-600 h-4 w-4 flex-shrink-0" />
+                  <p className="text-red-700 text-sm">{scanCountryError}</p>
+                </div>
+              )}
 
               {scanCountrySuccess && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
