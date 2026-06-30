@@ -2,8 +2,13 @@ import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { queryOne } from './db';
+import { getAuthBaseUrl } from './auth-url';
+
+const authBaseUrl = getAuthBaseUrl();
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
+  ...(authBaseUrl ? { url: authBaseUrl } : {}),
   providers: [
     CredentialsProvider({
       name: 'Credentials',
