@@ -53,7 +53,7 @@ async function initDatabase() {
         email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
         name VARCHAR(255) NOT NULL,
-        role ENUM('admin', 'user') DEFAULT 'user',
+        role ENUM('admin', 'user', 'superadmin') DEFAULT 'user',
         organization_id INT,
         scan_country VARCHAR(100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

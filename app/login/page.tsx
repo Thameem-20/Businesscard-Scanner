@@ -36,7 +36,13 @@ export default function LoginPage() {
       if (result?.error) {
         setError('Invalid email or password');
       } else {
-        router.push('/dashboard/cards');
+        const sessionRes = await fetch('/api/auth/session');
+        const sessionData = await sessionRes.json();
+        if (sessionData?.user?.role === 'superadmin') {
+          router.push('/superadmin-panel/dashboard');
+        } else {
+          router.push('/dashboard/cards');
+        }
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
