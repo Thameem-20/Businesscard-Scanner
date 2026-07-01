@@ -25,7 +25,15 @@ export default function SuperAdminLoginPage() {
     setLoading(true);
 
     try {
-      const result = await signIn('credentials', {
+      // Clear any existing non-superadmin session before signing in
+      if (
+        status === 'authenticated' &&
+        (session?.user as { role?: string })?.role !== 'superadmin'
+      ) {
+        await signOut({ redirect: false });
+      }
+
+      const result = await signIn('superadmin', {
         email,
         password,
         redirect: false,
@@ -37,12 +45,8 @@ export default function SuperAdminLoginPage() {
         return;
       }
 
-      const sessionRes = await fetch('/api/auth/session');
-      const sessionData = await sessionRes.json();
-
-      if (sessionData?.user?.role !== 'superadmin') {
-        await signOut({ redirect: false });
-        setError('Access denied. Super admin credentials required.');
+      if (!result?.ok) {
+        setError('Sign in failed. Please try again.');
         setLoading(false);
         return;
       }

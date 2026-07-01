@@ -26,6 +26,9 @@ export async function GET(
 
     const filterDate = getDateFilter(request.nextUrl.searchParams.get('date'));
     const countryFilter = request.nextUrl.searchParams.get('country') || '';
+    const userIdParam = request.nextUrl.searchParams.get('userId');
+    const userIdFilter =
+      userIdParam && /^\d+$/.test(userIdParam) ? parseInt(userIdParam, 10) : null;
 
     const organization = await queryOne(
       'SELECT id, name, created_at FROM organizations WHERE id = ?',
@@ -61,6 +64,22 @@ export async function GET(
       [organizationId]
     );
 
+    const cardsByUser = await query(
+      `SELECT
+         u.id AS user_id,
+         u.name,
+         u.email,
+         COUNT(bc.id) AS total_cards,
+         COUNT(CASE WHEN DATE(bc.created_at) = ? THEN bc.id END) AS cards_on_date
+       FROM users u
+       LEFT JOIN business_cards bc
+         ON bc.user_id = u.id AND bc.organization_id = u.organization_id
+       WHERE u.organization_id = ? AND u.role != 'superadmin'
+       GROUP BY u.id, u.name, u.email
+       ORDER BY total_cards DESC, u.name`,
+      [filterDate, organizationId]
+    );
+
     const dailyReport = await query(
       `SELECT DATE(created_at) AS date, COUNT(*) AS count
        FROM business_cards
@@ -91,6 +110,10 @@ export async function GET(
         recentCardsParams.push(countryFilter);
       }
     }
+    if (userIdFilter) {
+      recentCardsQuery += ' AND bc.user_id = ?';
+      recentCardsParams.push(userIdFilter);
+    }
 
     recentCardsQuery += ' ORDER BY bc.created_at DESC LIMIT 100';
 
@@ -104,6 +127,36 @@ export async function GET(
       [organizationId]
     );
 
+    let filteredCardCount: number | null = null;
+    if (countryFilter || userIdFilter) {
+      let countQuery = `
+        SELECT COUNT(*) AS count
+        FROM business_cards bc
+        WHERE bc.organization_id = ?
+      `;
+      const countParams: unknown[] = [organizationId];
+
+      if (filterDate) {
+        countQuery += ' AND DATE(bc.created_at) = ?';
+        countParams.push(filterDate);
+      }
+      if (countryFilter) {
+        if (countryFilter === '__uncategorized__') {
+          countQuery += " AND (bc.country IS NULL OR bc.country = '')";
+        } else {
+          countQuery += ' AND bc.country = ?';
+          countParams.push(countryFilter);
+        }
+      }
+      if (userIdFilter) {
+        countQuery += ' AND bc.user_id = ?';
+        countParams.push(userIdFilter);
+      }
+
+      const countRow = await queryOne(countQuery, countParams) as { count: number } | null;
+      filteredCardCount = countRow?.count ?? 0;
+    }
+
     return NextResponse.json({
       organization,
       filterDate,
@@ -114,8 +167,10 @@ export async function GET(
         active_users: 0,
       },
       cardsByCountry,
+      cardsByUser,
       dailyReport,
       recentCards,
+      filteredCardCount,
       users,
     });
   } catch (error: any) {

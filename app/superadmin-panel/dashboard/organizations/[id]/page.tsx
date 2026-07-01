@@ -34,6 +34,14 @@ interface CountryRow {
   count: number;
 }
 
+interface UserCardRow {
+  user_id: number;
+  name: string;
+  email: string;
+  total_cards: number;
+  cards_on_date: number;
+}
+
 interface DailyRow {
   date: string;
   count: number;
@@ -65,12 +73,15 @@ export default function OrganizationDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [filterDate, setFilterDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [countryFilter, setCountryFilter] = useState('');
+  const [userFilter, setUserFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [orgName, setOrgName] = useState('');
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [cardsByCountry, setCardsByCountry] = useState<CountryRow[]>([]);
+  const [cardsByUser, setCardsByUser] = useState<UserCardRow[]>([]);
+  const [filteredCardCount, setFilteredCardCount] = useState<number | null>(null);
   const [dailyReport, setDailyReport] = useState<DailyRow[]>([]);
   const [recentCards, setRecentCards] = useState<CardRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -93,6 +104,7 @@ export default function OrganizationDetailPage() {
     try {
       const qs = new URLSearchParams({ date: filterDate });
       if (countryFilter) qs.set('country', countryFilter);
+      if (userFilter) qs.set('userId', userFilter);
 
       const res = await fetch(`/api/superadmin/organizations/${orgId}?${qs}`);
       const data = await res.json();
@@ -102,6 +114,8 @@ export default function OrganizationDetailPage() {
       setEditOrgName(data.organization.name);
       setStats(data.stats);
       setCardsByCountry(data.cardsByCountry || []);
+      setCardsByUser(data.cardsByUser || []);
+      setFilteredCardCount(data.filteredCardCount ?? null);
       setDailyReport(data.dailyReport || []);
       setRecentCards(data.recentCards || []);
       setUsers(data.users || []);
@@ -110,7 +124,7 @@ export default function OrganizationDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, filterDate, countryFilter]);
+  }, [orgId, filterDate, countryFilter, userFilter]);
 
   useEffect(() => {
     loadOrg();
@@ -175,6 +189,14 @@ export default function OrganizationDetailPage() {
     }
   };
 
+  const selectedUser = userFilter
+    ? cardsByUser.find((u) => String(u.user_id) === userFilter)
+    : null;
+
+  const userCardCounts = new Map(
+    cardsByUser.map((u) => [u.user_id, { total: u.total_cards, onDate: u.cards_on_date }])
+  );
+
   const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'reports', label: 'Cards & Reports', icon: CreditCard },
@@ -215,17 +237,31 @@ export default function OrganizationDetailPage() {
             className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
           />
           {activeTab === 'reports' && (
-            <select
-              value={countryFilter}
-              onChange={(e) => setCountryFilter(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-            >
-              <option value="">All countries</option>
-              <option value="__uncategorized__">Uncategorized</option>
-              {cardsByCountry.map((c) => (
-                <option key={c.country} value={c.country}>{c.country} ({c.count})</option>
-              ))}
-            </select>
+            <>
+              <select
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white max-w-[200px]"
+              >
+                <option value="">All users</option>
+                {cardsByUser.map((u) => (
+                  <option key={u.user_id} value={String(u.user_id)}>
+                    {u.name} ({u.total_cards})
+                  </option>
+                ))}
+              </select>
+              <select
+                value={countryFilter}
+                onChange={(e) => setCountryFilter(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+              >
+                <option value="">All countries</option>
+                <option value="__uncategorized__">Uncategorized</option>
+                {cardsByCountry.map((c) => (
+                  <option key={c.country} value={c.country}>{c.country} ({c.count})</option>
+                ))}
+              </select>
+            </>
           )}
         </div>
       </div>
@@ -267,6 +303,41 @@ export default function OrganizationDetailPage() {
         <div className="grid lg:grid-cols-2 gap-6">
           <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-500" />
+              Cards by User
+            </h3>
+            {cardsByUser.length === 0 ? (
+              <p className="text-slate-500 text-sm">No users yet</p>
+            ) : (
+              <div className="space-y-2">
+                {cardsByUser.map((row) => (
+                  <button
+                    key={row.user_id}
+                    type="button"
+                    onClick={() => {
+                      setUserFilter(String(row.user_id));
+                      setActiveTab('reports');
+                    }}
+                    className="w-full flex items-center justify-between py-2 border-b border-slate-800 last:border-0 hover:bg-slate-800/40 rounded px-1 -mx-1 text-left transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-slate-300 text-sm block truncate">{row.name}</span>
+                      <span className="text-slate-500 text-xs truncate block">{row.email}</span>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-3">
+                      <span className="text-white font-medium block">{row.total_cards}</span>
+                      <span className="text-amber-400/80 text-xs">
+                        {row.cards_on_date} on {filterDate}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
               <Flag className="w-4 h-4 text-slate-500" />
               Cards by Country / Network
             </h3>
@@ -284,7 +355,7 @@ export default function OrganizationDetailPage() {
             )}
           </section>
 
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 lg:col-span-2">
             <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-slate-500" />
               Last 30 Days Activity
@@ -312,10 +383,18 @@ export default function OrganizationDetailPage() {
           <div className="px-5 py-4 border-b border-slate-800">
             <h3 className="text-sm font-semibold text-white">
               Cards
+              {selectedUser ? ` — ${selectedUser.name}` : ''}
               {countryFilter ? ` — ${countryFilter === '__uncategorized__' ? 'Uncategorized' : countryFilter}` : ''}
               {filterDate ? ` on ${filterDate}` : ''}
             </h3>
-            <p className="text-xs text-slate-500 mt-1">{recentCards.length} card(s) shown</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {filteredCardCount !== null
+                ? `${filteredCardCount} card(s) match filters`
+                : `${recentCards.length} card(s) shown`}
+              {recentCards.length === 100 && filteredCardCount !== null && filteredCardCount > 100
+                ? ' (showing latest 100)'
+                : ''}
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -368,13 +447,17 @@ export default function OrganizationDetailPage() {
                   <th className="text-left py-3 px-4">Name</th>
                   <th className="text-left py-3 px-4">Email</th>
                   <th className="text-left py-3 px-4">Role</th>
+                  <th className="text-right py-3 px-4">Total Cards</th>
+                  <th className="text-right py-3 px-4">On {filterDate}</th>
                   <th className="text-left py-3 px-4">Status</th>
                   <th className="text-left py-3 px-4">Joined</th>
                   <th className="text-right py-3 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
+                {users.map((user) => {
+                  const counts = userCardCounts.get(user.id);
+                  return (
                   <tr key={user.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                     <td className="py-3 px-4 text-white">{user.name}</td>
                     <td className="py-3 px-4 text-slate-400">{user.email}</td>
@@ -384,6 +467,21 @@ export default function OrganizationDetailPage() {
                       }`}>
                         {user.role}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserFilter(String(user.id));
+                          setActiveTab('reports');
+                        }}
+                        className="text-white font-medium hover:text-amber-400"
+                      >
+                        {counts?.total ?? 0}
+                      </button>
+                    </td>
+                    <td className="py-3 px-4 text-right text-amber-400/90">
+                      {counts?.onDate ?? 0}
                     </td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded text-xs ${
@@ -406,10 +504,11 @@ export default function OrganizationDetailPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500">No users in this organization</td>
+                    <td colSpan={8} className="py-12 text-center text-slate-500">No users in this organization</td>
                   </tr>
                 )}
               </tbody>
