@@ -53,7 +53,7 @@ async function initDatabase() {
         email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
         name VARCHAR(255) NOT NULL,
-        role ENUM('admin', 'user', 'superadmin') DEFAULT 'user',
+        role ENUM('admin', 'manager', 'user', 'superadmin') DEFAULT 'user',
         organization_id INT,
         scan_country VARCHAR(100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -61,6 +61,29 @@ async function initDatabase() {
         FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
         INDEX idx_org_id (organization_id),
         INDEX idx_email (email)
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS departments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        organization_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_org_dept (organization_id, name),
+        INDEX idx_org_id (organization_id),
+        FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_departments (
+        user_id INT NOT NULL,
+        department_id INT NOT NULL,
+        PRIMARY KEY (user_id, department_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
       )
     `);
 
@@ -80,16 +103,19 @@ async function initDatabase() {
         image_url VARCHAR(500),
         cloud_storage_url VARCHAR(500),
         raw_text TEXT,
+        department_id INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
         INDEX idx_user_id (user_id),
         INDEX idx_org_id (organization_id),
         INDEX idx_name (name),
         INDEX idx_email (email),
         INDEX idx_phone (phone),
-        INDEX idx_country (country)
+        INDEX idx_country (country),
+        INDEX idx_department_id (department_id)
       )
     `);
 
@@ -97,6 +123,11 @@ async function initDatabase() {
     await connection.query(`
       INSERT IGNORE INTO organizations (id, name) 
       VALUES (1, 'Default Organization')
+    `);
+
+    await connection.query(`
+      INSERT IGNORE INTO departments (organization_id, name)
+      VALUES (1, 'Sales')
     `);
 
     // Create default admin user with hashed password

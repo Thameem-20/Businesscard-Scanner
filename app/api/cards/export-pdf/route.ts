@@ -5,25 +5,25 @@ import { query } from '@/lib/db';
 import { getCardImageBuffer } from '@/lib/azure-blob-storage';
 import fs from 'fs';
 import path from 'path';
+import { cardVisibilityClause, getAccessContext } from '@/lib/access';
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
+    const access = await getAccessContext(session);
+
+    if (!access) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
-    const organizationId = (session.user as any).organizationId;
-    
-    // Get all cards from the same organization
+
+    const visibility = cardVisibilityClause(access);
     const cards = await query(
       `SELECT bc.*, u.name as uploaded_by 
        FROM business_cards bc
        JOIN users u ON bc.user_id = u.id
-       WHERE bc.organization_id = ?
+       WHERE ${visibility.sql}
        ORDER BY bc.created_at DESC`,
-      [organizationId]
+      visibility.params
     ) as any[];
     
     if (cards.length === 0) {

@@ -10,12 +10,14 @@ import {
   getBlobNameFromUrl,
   isAzureBlobUrl,
 } from '@/lib/azure-blob-storage';
+import { canAccessCard, getAccessContext } from '@/lib/access';
 
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
+    const access = await getAccessContext(session);
+
+    if (!access || !access.organizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
@@ -26,9 +28,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Card ID required' }, { status: 400 });
     }
     
-    const organizationId = typeof (session.user as any).organizationId === 'string'
-      ? parseInt((session.user as any).organizationId)
-      : (session.user as any).organizationId;
+    if (!(await canAccessCard(access, parseInt(cardId, 10)))) {
+      return NextResponse.json({ error: 'Card not found or unauthorized' }, { status: 404 });
+    }
+
+    const organizationId = access.organizationId;
     
     const card = await query(
       `SELECT * FROM business_cards WHERE id = ? AND organization_id = ?`,

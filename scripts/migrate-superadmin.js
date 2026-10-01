@@ -30,7 +30,7 @@ async function migrate() {
   try {
     await connection.query(`
       ALTER TABLE users
-      MODIFY COLUMN role ENUM('admin', 'user', 'superadmin') DEFAULT 'user'
+      MODIFY COLUMN role ENUM('admin', 'manager', 'user', 'superadmin') DEFAULT 'user'
     `);
     console.log('Updated users.role enum to include superadmin');
 

@@ -64,7 +64,16 @@ interface UserRow {
   role: string;
   is_active: boolean | number;
   created_at: string;
+  departments?: string;
+  department_ids?: number[];
 }
+
+interface DepartmentRow {
+  id: number;
+  name: string;
+}
+
+type OrgRole = 'admin' | 'manager' | 'user';
 
 export default function OrganizationDetailPage() {
   const params = useParams();
@@ -85,6 +94,8 @@ export default function OrganizationDetailPage() {
   const [dailyReport, setDailyReport] = useState<DailyRow[]>([]);
   const [recentCards, setRecentCards] = useState<CardRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [departments, setDepartments] = useState<DepartmentRow[]>([]);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
 
   const [editingOrg, setEditingOrg] = useState(false);
   const [editOrgName, setEditOrgName] = useState('');
@@ -92,9 +103,10 @@ export default function OrganizationDetailPage() {
   const [userForm, setUserForm] = useState({
     name: '',
     email: '',
-    role: 'user' as 'admin' | 'user',
+    role: 'user' as OrgRole,
     isActive: true,
     password: '',
+    departmentIds: [] as number[],
   });
   const [saving, setSaving] = useState(false);
 
@@ -119,6 +131,7 @@ export default function OrganizationDetailPage() {
       setDailyReport(data.dailyReport || []);
       setRecentCards(data.recentCards || []);
       setUsers(data.users || []);
+      setDepartments(data.departments || []);
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || 'Failed to load organization');
     } finally {
@@ -155,10 +168,31 @@ export default function OrganizationDetailPage() {
     setUserForm({
       name: user.name,
       email: user.email,
-      role: user.role as 'admin' | 'user',
+      role: (['admin', 'manager', 'user'].includes(user.role) ? user.role : 'user') as OrgRole,
       isActive: user.is_active === true || user.is_active === 1,
       password: '',
+      departmentIds: user.department_ids || [],
     });
+  };
+
+  const handleAddDepartment = async () => {
+    if (!newDepartmentName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/superadmin/departments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId: parseInt(orgId), name: newDepartmentName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setNewDepartmentName('');
+      await loadOrg();
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Failed to create department');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdateUser = async () => {
@@ -176,6 +210,7 @@ export default function OrganizationDetailPage() {
           organizationId: parseInt(orgId),
           isActive: userForm.isActive,
           password: userForm.password || undefined,
+          departmentIds: userForm.departmentIds,
         }),
       });
       const data = await res.json();
@@ -436,9 +471,33 @@ export default function OrganizationDetailPage() {
 
       {activeTab === 'users' && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-800">
-            <h3 className="text-sm font-semibold text-white">Users in {orgName}</h3>
-            <p className="text-xs text-slate-500 mt-1">{users.length} user(s)</p>
+          <div className="px-5 py-4 border-b border-slate-800 space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-white">Users in {orgName}</h3>
+              <p className="text-xs text-slate-500 mt-1">{users.length} user(s)</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {departments.map((department) => (
+                <span key={department.id} className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300">
+                  {department.name}
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={newDepartmentName}
+                onChange={(e) => setNewDepartmentName(e.target.value)}
+                placeholder="Add department"
+                className="bg-slate-800 border-slate-600 text-white h-9"
+              />
+              <Button
+                onClick={handleAddDepartment}
+                disabled={saving || !newDepartmentName.trim()}
+                className="bg-amber-500 hover:bg-amber-600 text-slate-950 h-9"
+              >
+                Add
+              </Button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -447,6 +506,7 @@ export default function OrganizationDetailPage() {
                   <th className="text-left py-3 px-4">Name</th>
                   <th className="text-left py-3 px-4">Email</th>
                   <th className="text-left py-3 px-4">Role</th>
+                  <th className="text-left py-3 px-4">Departments</th>
                   <th className="text-right py-3 px-4">Total Cards</th>
                   <th className="text-right py-3 px-4">On {filterDate}</th>
                   <th className="text-left py-3 px-4">Status</th>
@@ -463,11 +523,16 @@ export default function OrganizationDetailPage() {
                     <td className="py-3 px-4 text-slate-400">{user.email}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded text-xs capitalize ${
-                        user.role === 'admin' ? 'bg-purple-500/20 text-purple-300' : 'bg-slate-700 text-slate-300'
+                        user.role === 'admin'
+                          ? 'bg-purple-500/20 text-purple-300'
+                          : user.role === 'manager'
+                          ? 'bg-blue-500/20 text-blue-300'
+                          : 'bg-slate-700 text-slate-300'
                       }`}>
                         {user.role}
                       </span>
                     </td>
+                    <td className="py-3 px-4 text-slate-400">{user.departments || '—'}</td>
                     <td className="py-3 px-4 text-right">
                       <button
                         type="button"
@@ -508,7 +573,7 @@ export default function OrganizationDetailPage() {
                 })}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">No users in this organization</td>
+                    <td colSpan={9} className="py-12 text-center text-slate-500">No users in this organization</td>
                   </tr>
                 )}
               </tbody>
@@ -561,12 +626,35 @@ export default function OrganizationDetailPage() {
             <Field label="Role">
               <select
                 value={userForm.role}
-                onChange={(e) => setUserForm({ ...userForm, role: e.target.value as 'admin' | 'user' })}
+                onChange={(e) => setUserForm({ ...userForm, role: e.target.value as OrgRole })}
                 className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-white text-sm"
               >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
+                <option value="user">User — own cards only</option>
+                <option value="manager">Manager — assigned departments</option>
+                <option value="admin">Admin — all cards</option>
               </select>
+            </Field>
+            <Field label="Departments">
+              <div className="space-y-2 max-h-36 overflow-y-auto border border-slate-700 rounded-md p-3">
+                {departments.length === 0 && (
+                  <p className="text-xs text-slate-500">Add a department above first.</p>
+                )}
+                {departments.map((department) => (
+                  <label key={department.id} className="flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={userForm.departmentIds.includes(department.id)}
+                      onChange={() => {
+                        const selected = userForm.departmentIds.includes(department.id)
+                          ? userForm.departmentIds.filter((id) => id !== department.id)
+                          : [...userForm.departmentIds, department.id];
+                        setUserForm({ ...userForm, departmentIds: selected });
+                      }}
+                    />
+                    {department.name}
+                  </label>
+                ))}
+              </div>
             </Field>
             <div className="flex items-center gap-2">
               <input

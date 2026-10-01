@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { UserPlus, X, CheckCircle, Power } from 'lucide-react';
+import { UserPlus, X, CheckCircle, Power, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,21 @@ interface User {
   role: string;
   is_active: boolean;
   created_at: string;
+  departments?: string;
+  department_ids?: number[];
+}
+
+interface Department {
+  id: number;
+  name: string;
+}
+
+type OrgRole = 'admin' | 'manager' | 'user';
+
+function roleBadgeClass(role: string) {
+  if (role === 'admin') return 'bg-purple-100 text-purple-800';
+  if (role === 'manager') return 'bg-blue-100 text-blue-800';
+  return 'bg-gray-100 text-gray-800';
 }
 
 interface Organization {
@@ -34,24 +49,35 @@ export default function UsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [addingDepartment, setAddingDepartment] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     name: '',
-    role: 'user' as 'admin' | 'user',
+    role: 'user' as OrgRole,
     organizationId: '',
+    departmentIds: [] as number[],
+  });
+  const [editForm, setEditForm] = useState({
+    role: 'user' as OrgRole,
+    departmentIds: [] as number[],
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     } else if (status === 'authenticated') {
       fetchUsers();
+      fetchDepartments();
       // Only fetch organizations if user is admin (needed for adding users)
       const userRole = (session?.user as any)?.role;
       if (userRole === 'admin') {
@@ -71,6 +97,18 @@ export default function UsersPage() {
       console.error('Failed to fetch users:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await fetch('/api/departments/list');
+      const data = await response.json();
+      if (data.departments) {
+        setDepartments(data.departments);
+      }
+    } catch (err) {
+      console.error('Failed to fetch departments:', err);
     }
   };
 
@@ -119,6 +157,7 @@ export default function UsersPage() {
         name: '',
         role: 'user',
         organizationId: formData.organizationId,
+        departmentIds: [],
       });
       // Close modal after a short delay to show success message
       setTimeout(() => {
@@ -129,6 +168,78 @@ export default function UsersPage() {
       fetchUsers();
     } catch (err: any) {
       setError(err.message || 'Failed to create user');
+    }
+  };
+
+  const toggleDepartment = (
+    departmentId: number,
+    selected: number[],
+    setter: (ids: number[]) => void
+  ) => {
+    setter(
+      selected.includes(departmentId)
+        ? selected.filter((id) => id !== departmentId)
+        : [...selected, departmentId]
+    );
+  };
+
+  const handleAddDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDepartmentName.trim()) return;
+    setAddingDepartment(true);
+    setError('');
+    try {
+      const response = await fetch('/api/departments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newDepartmentName.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create department');
+      setNewDepartmentName('');
+      setSuccess('Department created');
+      setTimeout(() => setSuccess(''), 3000);
+      fetchDepartments();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create department');
+    } finally {
+      setAddingDepartment(false);
+    }
+  };
+
+  const openEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditForm({
+      role: (['admin', 'manager', 'user'].includes(user.role) ? user.role : 'user') as OrgRole,
+      departmentIds: user.department_ids || [],
+    });
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setSavingEdit(true);
+    setError('');
+    try {
+      const response = await fetch('/api/users/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: editingUser.id,
+          role: editForm.role,
+          departmentIds: editForm.departmentIds,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update user');
+      setSuccess('User updated');
+      setEditingUser(null);
+      fetchUsers();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update user');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -185,7 +296,9 @@ export default function UsersPage() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">My Team</h1>
             <p className="text-gray-600">
-              {isAdmin ? 'Manage users in your organization' : 'View users in your organization'}
+              {isAdmin
+                ? 'Manage roles and departments in your organization'
+                : 'View users in your organization'}
             </p>
           </div>
           {isAdmin && (
@@ -198,6 +311,35 @@ export default function UsersPage() {
             </Button>
           )}
         </div>
+
+        {isAdmin && (
+          <div className="mb-6 bg-white rounded-lg border border-gray-200 p-4">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">Departments</h2>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {departments.length === 0 && (
+                <p className="text-sm text-gray-500">No departments yet. Add Sales or another team.</p>
+              )}
+              {departments.map((department) => (
+                <span
+                  key={department.id}
+                  className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700"
+                >
+                  {department.name}
+                </span>
+              ))}
+            </div>
+            <form onSubmit={handleAddDepartment} className="flex gap-2">
+              <Input
+                value={newDepartmentName}
+                onChange={(e) => setNewDepartmentName(e.target.value)}
+                placeholder="Add department (e.g. Sales)"
+              />
+              <Button type="submit" disabled={addingDepartment || !newDepartmentName.trim()}>
+                Add
+              </Button>
+            </form>
+          </div>
+        )}
 
         {/* Add User Modal */}
         <Dialog open={showForm} onOpenChange={setShowForm}>
@@ -270,12 +412,41 @@ export default function UsersPage() {
                 </label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'user' })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as OrgRole })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                 >
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
+                  <option value="user">User — own cards only</option>
+                  <option value="manager">Manager — assigned departments</option>
+                  <option value="admin">Admin — all cards</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Departments
+                </label>
+                <div className="space-y-2 max-h-36 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                  {departments.length === 0 && (
+                    <p className="text-sm text-gray-500">Add a department first.</p>
+                  )}
+                  {departments.map((department) => (
+                    <label key={department.id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={formData.departmentIds.includes(department.id)}
+                        onChange={() =>
+                          toggleDepartment(department.id, formData.departmentIds, (departmentIds) =>
+                            setFormData({ ...formData, departmentIds })
+                          )
+                        }
+                      />
+                      {department.name}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Users are stamped with their first department. Managers see every selected department.
+                </p>
               </div>
 
               <div>
@@ -310,6 +481,7 @@ export default function UsersPage() {
                       name: '',
                       role: 'user',
                       organizationId: formData.organizationId,
+                      departmentIds: [],
                     });
                   }}
                   className="flex-1"
@@ -351,31 +523,43 @@ export default function UsersPage() {
                   <p className="text-sm text-gray-600 truncate mt-1">{user.email}</p>
                 </div>
                 <span
-                  className={`ml-3 px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${
-                    user.role === 'admin'
-                      ? 'bg-purple-100 text-purple-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
+                  className={`ml-3 px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap flex-shrink-0 ${roleBadgeClass(user.role)}`}
                 >
                   {user.role}
                 </span>
               </div>
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+              {user.departments && (
+                <p className="text-xs text-gray-500 mb-2">{user.departments}</p>
+              )}
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
                 <p className="text-xs text-gray-500">
                   Created: {new Date(user.created_at).toLocaleDateString()}
                 </p>
-                {isAdmin && user.role !== 'admin' && (
-                  <Button
-                    variant={user.is_active ? "destructive" : "default"}
-                    size="sm"
-                    onClick={() => handleToggleStatus(user.id, user.is_active)}
-                    disabled={togglingUserId === user.id || user.id === (session?.user as any)?.id}
-                    className="flex items-center gap-1.5"
-                  >
-                    <Power size={14} />
-                    <span>{user.is_active ? 'Deactivate' : 'Activate'}</span>
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditUser(user)}
+                      className="flex items-center gap-1.5"
+                    >
+                      <Pencil size={14} />
+                      <span>Edit</span>
+                    </Button>
+                  )}
+                  {isAdmin && user.role !== 'admin' && (
+                    <Button
+                      variant={user.is_active ? "destructive" : "default"}
+                      size="sm"
+                      onClick={() => handleToggleStatus(user.id, user.is_active)}
+                      disabled={togglingUserId === user.id || user.id === (session?.user as any)?.id}
+                      className="flex items-center gap-1.5"
+                    >
+                      <Power size={14} />
+                      <span>{user.is_active ? 'Deactivate' : 'Activate'}</span>
+                    </Button>
+                  )}
+                </div>
               </div>
               {user.is_active === false && (
                 <div className="mt-2 pt-2 border-t border-gray-100">
@@ -403,6 +587,9 @@ export default function UsersPage() {
                     Role
                   </th>
                   <th className="px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Departments
+                  </th>
+                  <th className="px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-4 xl:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -426,14 +613,13 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 xl:px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          user.role === 'admin'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${roleBadgeClass(user.role)}`}
                       >
                         {user.role}
                       </span>
+                    </td>
+                    <td className="px-4 xl:px-6 py-4 text-sm text-gray-500">
+                      {user.departments || '—'}
                     </td>
                     <td className="px-4 xl:px-6 py-4 whitespace-nowrap">
                       <span
@@ -450,18 +636,31 @@ export default function UsersPage() {
                       {new Date(user.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-4 xl:px-6 py-4 whitespace-nowrap text-sm">
-                      {isAdmin && user.role !== 'admin' && (
-                        <Button
-                          variant={user.is_active ? "destructive" : "default"}
-                          size="sm"
-                          onClick={() => handleToggleStatus(user.id, user.is_active)}
-                          disabled={togglingUserId === user.id || user.id === (session?.user as any)?.id}
-                          className="flex items-center gap-1.5"
-                        >
-                          <Power size={14} />
-                          <span>{user.is_active ? 'Deactivate' : 'Activate'}</span>
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditUser(user)}
+                            className="flex items-center gap-1.5"
+                          >
+                            <Pencil size={14} />
+                            <span>Edit</span>
+                          </Button>
+                        )}
+                        {isAdmin && user.role !== 'admin' && (
+                          <Button
+                            variant={user.is_active ? "destructive" : "default"}
+                            size="sm"
+                            onClick={() => handleToggleStatus(user.id, user.is_active)}
+                            disabled={togglingUserId === user.id || user.id === (session?.user as any)?.id}
+                            className="flex items-center gap-1.5"
+                          >
+                            <Power size={14} />
+                            <span>{user.is_active ? 'Deactivate' : 'Activate'}</span>
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -470,6 +669,58 @@ export default function UsersPage() {
             </div>
           </div>
         )}
+
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit {editingUser?.name}</DialogTitle>
+              <DialogDescription>
+                Change this user&apos;s role and department access
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value as OrgRole })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                >
+                  <option value="user">User — own cards only</option>
+                  <option value="manager">Manager — assigned departments</option>
+                  <option value="admin">Admin — all cards</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Departments</label>
+                <div className="space-y-2 max-h-36 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                  {departments.map((department) => (
+                    <label key={department.id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={editForm.departmentIds.includes(department.id)}
+                        onChange={() =>
+                          toggleDepartment(department.id, editForm.departmentIds, (departmentIds) =>
+                            setEditForm({ ...editForm, departmentIds })
+                          )
+                        }
+                      />
+                      {department.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setEditingUser(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={savingEdit}>
+                  {savingEdit ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

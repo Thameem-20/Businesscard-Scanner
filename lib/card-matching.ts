@@ -123,7 +123,8 @@ export async function findMatchingCards(
 export async function checkDuplicateName(
   name: string,
   organizationId: number,
-  excludeId?: number
+  excludeId?: number,
+  extraClause?: { sql: string; params: unknown[] }
 ): Promise<MatchedCard | null> {
   if (!name) return null;
   
@@ -134,16 +135,20 @@ export async function checkDuplicateName(
     console.error('Invalid organizationId:', organizationId);
     return null;
   }
+
+  const extraSql = extraClause?.sql ? `AND ${extraClause.sql}` : '';
+  const extraParams = extraClause?.params ?? [];
   
   // Query with explicit organization_id filter
   const existingCards = await query(
-    `SELECT * FROM business_cards 
-     WHERE organization_id = ? 
-     ${excludeId ? 'AND id != ?' : ''}
-     AND name LIKE ?`,
+    `SELECT * FROM business_cards bc
+     WHERE bc.organization_id = ? 
+     ${excludeId ? 'AND bc.id != ?' : ''}
+     ${extraSql}
+     AND bc.name LIKE ?`,
     excludeId 
-      ? [orgId, excludeId, `%${name}%`]
-      : [orgId, `%${name}%`]
+      ? [orgId, excludeId, ...extraParams, `%${name}%`]
+      : [orgId, ...extraParams, `%${name}%`]
   ) as any[];
   
   // Double-check that all returned cards belong to the correct organization

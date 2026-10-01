@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { seedDefaultDepartments } from '@/lib/departments';
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
           [organizationName]
         ) as any;
         organizationId = orgResult.insertId;
+        await seedDefaultDepartments(organizationId);
       }
     }
     

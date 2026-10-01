@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { query, queryOne } from '@/lib/db';
 import { getSuperAdminSession } from '@/lib/superadmin';
+import { isOrgRole } from '@/lib/access';
+import { setUserDepartments } from '@/lib/departments';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -19,6 +21,7 @@ export async function PUT(request: NextRequest) {
       organizationId,
       isActive,
       password,
+      departmentIds,
     } = body;
 
     if (!userId) {
@@ -38,7 +41,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot edit superadmin accounts' }, { status: 400 });
     }
 
-    if (role && !['admin', 'user'].includes(role)) {
+    if (role && !isOrgRole(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
@@ -80,12 +83,34 @@ export async function PUT(request: NextRequest) {
       values.push(await bcrypt.hash(password, 10));
     }
 
-    if (updates.length === 0) {
-      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    if (updates.length > 0) {
+      values.push(userId);
+      await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
     }
 
-    values.push(userId);
-    await query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+    if (Array.isArray(departmentIds)) {
+      const orgId =
+        organizationId ??
+        (
+          (await queryOne(
+            'SELECT organization_id FROM users WHERE id = ?',
+            [userId]
+          )) as { organization_id: number | null } | null
+        )?.organization_id;
+
+      if (!orgId) {
+        return NextResponse.json(
+          { error: 'User must belong to an organization to assign departments' },
+          { status: 400 }
+        );
+      }
+
+      await setUserDepartments(userId, departmentIds, orgId);
+    }
+
+    if (updates.length === 0 && !Array.isArray(departmentIds)) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

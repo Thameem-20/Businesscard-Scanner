@@ -119,11 +119,31 @@ export async function GET(
 
     const recentCards = await query(recentCardsQuery, recentCardsParams);
 
-    const users = await query(
-      `SELECT u.id, u.email, u.name, u.role, u.is_active, u.created_at
+    const users = ((await query(
+      `SELECT
+         u.id, u.email, u.name, u.role, u.is_active, u.created_at,
+         GROUP_CONCAT(d.name ORDER BY d.name SEPARATOR ', ') AS departments,
+         GROUP_CONCAT(d.id ORDER BY d.name) AS department_ids
        FROM users u
+       LEFT JOIN user_departments ud ON ud.user_id = u.id
+       LEFT JOIN departments d ON d.id = ud.department_id
        WHERE u.organization_id = ? AND u.role != 'superadmin'
+       GROUP BY u.id, u.email, u.name, u.role, u.is_active, u.created_at
        ORDER BY u.name`,
+      [organizationId]
+    )) as any[]).map((user) => ({
+      ...user,
+      department_ids: user.department_ids
+        ? String(user.department_ids)
+            .split(',')
+            .map((id: string) => parseInt(id, 10))
+            .filter((id: number) => Number.isFinite(id))
+        : [],
+      departments: user.departments || '',
+    }));
+
+    const departments = await query(
+      'SELECT id, name FROM departments WHERE organization_id = ? ORDER BY name',
       [organizationId]
     );
 
@@ -172,6 +192,7 @@ export async function GET(
       recentCards,
       filteredCardCount,
       users,
+      departments,
     });
   } catch (error: any) {
     console.error('Superadmin organization detail error:', error);

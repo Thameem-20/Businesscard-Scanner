@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getSuperAdminSession } from '@/lib/superadmin';
+import { seedDefaultDepartments } from '@/lib/departments';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,8 @@ export async function POST(request: NextRequest) {
       'INSERT INTO organizations (name) VALUES (?)',
       [name.trim()]
     ) as { insertId: number };
+
+    await seedDefaultDepartments(result.insertId);
 
     return NextResponse.json({ success: true, organizationId: result.insertId });
   } catch (error: any) {

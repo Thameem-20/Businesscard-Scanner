@@ -4,12 +4,14 @@ import { authOptions } from '@/lib/auth';
 import { processBusinessCard } from '@/lib/ocr';
 import { checkDuplicateName } from '@/lib/card-matching';
 import { uploadToBlob, getReadableBlobUrl } from '@/lib/azure-blob-storage';
+import { cardVisibilityClause, getAccessContext } from '@/lib/access';
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
+    const access = await getAccessContext(session);
+
+    if (!access) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
@@ -23,11 +25,9 @@ export async function POST(request: NextRequest) {
     // Process OCR
     const cardData = await processBusinessCard(file);
     
-    const organizationId = typeof (session.user as any).organizationId === 'string'
-      ? parseInt((session.user as any).organizationId)
-      : (session.user as any).organizationId;
-    
-    if (!organizationId || isNaN(organizationId)) {
+    const organizationId = access.organizationId;
+
+    if (!organizationId) {
       return NextResponse.json({ 
         error: 'Organization ID is required' 
       }, { status: 400 });
@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
     const { url: imageUrl, blobName } = await uploadToBlob(buffer, file.name, file.type || 'image/jpeg');
     const imageDisplayUrl = await getReadableBlobUrl(imageUrl);
     
-    // Check for duplicate name (only within the same organization)
+    const visibility = cardVisibilityClause(access);
     const duplicate = cardData.name
-      ? await checkDuplicateName(cardData.name, organizationId)
+      ? await checkDuplicateName(cardData.name, organizationId, undefined, visibility)
       : null;
     
     if (duplicate) {

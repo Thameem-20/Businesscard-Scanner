@@ -24,6 +24,7 @@ interface BusinessCard {
   phone?: string;
   address?: string;
   country?: string;
+  department_name?: string;
   website?: string;
   image_url?: string;
   image_display_url?: string;
@@ -183,7 +184,13 @@ export default function CardsPage() {
       <div className="h-full w-full">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Business Cards</h1>
-          <p className="text-gray-600">View and manage all business cards in your organization</p>
+          <p className="text-gray-600">
+            {(session.user as any)?.role === 'admin'
+              ? 'All cards in your organization'
+              : (session.user as any)?.role === 'manager'
+              ? 'Cards from your departments'
+              : 'Cards you have scanned'}
+          </p>
         </div>
 
         <div className="mb-6 flex flex-col sm:flex-row gap-3">
@@ -483,6 +490,16 @@ export default function CardsPage() {
                   </label>
                   <p className="text-sm text-gray-900">{selectedCard.country || 'Uncategorized'}</p>
                 </div>
+
+                {selectedCard.department_name && (
+                  <div className="bg-gray-50 rounded-lg p-2.5">
+                    <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                      <Building2 className="h-3 w-3" />
+                      Department
+                    </label>
+                    <p className="text-sm text-gray-900">{selectedCard.department_name}</p>
+                  </div>
+                )}
 
                 {/* Website */}
                 <div className="bg-gray-50 rounded-lg p-2.5">

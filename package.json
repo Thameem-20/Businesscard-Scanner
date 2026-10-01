@@ -12,7 +12,8 @@
     "db:reset-admin": "node scripts/reset-admin-password.js",
     "generate-icons": "node scripts/generate-icons.js",
     "db:migrate-country": "node scripts/migrate-add-country.js",
-    "db:migrate-superadmin": "node scripts/migrate-superadmin.js"
+    "db:migrate-superadmin": "node scripts/migrate-superadmin.js",
+    "db:migrate-departments": "node scripts/migrate-departments.js"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.32.0",

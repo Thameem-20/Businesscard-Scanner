@@ -12,7 +12,13 @@ function loadEnvFile(filePath) {
     if (separatorIndex === -1) continue;
 
     const key = trimmed.slice(0, separatorIndex).trim();
-    const value = trimmed.slice(separatorIndex + 1).trim();
+    let value = trimmed.slice(separatorIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
     if (!process.env[key]) {
       process.env[key] = value;
     }
