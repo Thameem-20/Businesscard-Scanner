@@ -516,7 +516,7 @@ export default function CardsPage() {
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent
           hideCloseButton
-          className="max-w-2xl h-[100dvh] md:h-auto md:max-h-[90vh] overflow-hidden p-0 fixed inset-0 md:inset-auto md:left-[50%] md:top-[50%] translate-x-0 md:translate-x-[-50%] translate-y-0 md:translate-y-[-50%] rounded-none md:rounded-2xl w-full flex flex-col bg-[#f2f2f7] gap-0"
+          className="max-w-2xl h-[100dvh] md:h-auto md:max-h-[90vh] overflow-hidden p-0 fixed inset-0 top-0 left-0 md:inset-auto md:left-[50%] md:top-[50%] translate-x-0 translate-y-0 md:translate-x-[-50%] md:translate-y-[-50%] rounded-none md:rounded-2xl w-full flex flex-col bg-[#f2f2f7] gap-0"
         >
           <DialogHeader className="sr-only">
             <DialogTitle>Card details</DialogTitle>
@@ -525,38 +525,40 @@ export default function CardsPage() {
           {selectedCard && (
             <div className="flex flex-col flex-1 min-h-0">
               <div
-                className="flex items-center justify-between px-2 h-12 bg-[#f2f2f7]/95 backdrop-blur-md flex-shrink-0"
-                style={{ paddingTop: 'env(safe-area-inset-top)', minHeight: '3rem' }}
+                className="flex-shrink-0 bg-[#f2f2f7]/95 backdrop-blur-md border-b border-slate-200/70"
+                style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEditing) {
-                      setIsEditing(false);
-                      setEditFormData(selectedCard);
-                    } else {
-                      setIsDetailOpen(false);
-                    }
-                  }}
-                  className="text-indigo-600 text-[16px] font-medium px-2 h-10 inline-flex items-center gap-0.5"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                  {isEditing ? 'Cancel' : 'Cards'}
-                </button>
-                <p className="font-semibold text-slate-900 text-[16px]">
-                  {isEditing ? 'Edit' : 'Contact'}
-                </p>
-                {!isEditing ? (
+                <div className="flex items-center justify-between px-2 h-12">
                   <button
                     type="button"
-                    onClick={() => setIsEditing(true)}
-                    className="text-indigo-600 text-[16px] font-medium px-3 h-10 inline-flex items-center"
+                    onClick={() => {
+                      if (isEditing) {
+                        setIsEditing(false);
+                        setEditFormData(selectedCard);
+                      } else {
+                        setIsDetailOpen(false);
+                      }
+                    }}
+                    className="text-indigo-600 text-[16px] font-medium px-2 h-10 inline-flex items-center gap-0.5"
                   >
-                    Edit
+                    <ChevronLeft className="h-5 w-5" />
+                    {isEditing ? 'Cancel' : 'Cards'}
                   </button>
-                ) : (
-                  <span className="w-16" />
-                )}
+                  <p className="font-semibold text-slate-900 text-[16px]">
+                    {isEditing ? 'Edit' : 'Contact'}
+                  </p>
+                  {!isEditing ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="text-indigo-600 text-[16px] font-medium px-3 h-10 inline-flex items-center"
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <span className="w-16" />
+                  )}
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto">
@@ -734,7 +736,10 @@ export default function CardsPage() {
                   </InfoRow>
                 </div>
 
-                <div className="px-4 pb-10 space-y-2">
+                <div
+                  className="px-4 pb-10 space-y-2"
+                  style={{ paddingBottom: 'max(2.5rem, calc(env(safe-area-inset-bottom) + 1.5rem))' }}
+                >
                   {isEditing ? (
                     <Button
                       onClick={handleSave}
@@ -766,14 +771,15 @@ export default function CardsPage() {
         <Dialog open={isImageViewerOpen} onOpenChange={setIsImageViewerOpen}>
           <DialogContent
             hideCloseButton
-            className="max-w-[100vw] max-h-[100dvh] h-[100dvh] p-0 bg-black border-none rounded-none"
+            className="max-w-[100vw] max-h-[100dvh] h-[100dvh] p-0 bg-black border-none rounded-none inset-0 top-0 left-0 translate-x-0 translate-y-0"
           >
             <div className="relative w-full h-full flex items-center justify-center p-4">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsImageViewerOpen(false)}
-                className="absolute top-4 right-4 z-50 bg-white/90 hover:bg-white text-slate-900 rounded-full h-10 w-10"
+                className="absolute right-4 z-50 bg-white/90 hover:bg-white text-slate-900 rounded-full h-10 w-10"
+                style={{ top: 'max(1rem, env(safe-area-inset-top))' }}
               >
                 <X className="h-5 w-5" />
               </Button>
