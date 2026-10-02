@@ -88,3 +88,82 @@ export async function setUserDepartments(
     );
   }
 }
+
+export async function renameDepartment(
+  departmentId: number,
+  organizationId: number,
+  name: string
+): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error('Department name is required');
+  }
+
+  const result = (await query(
+    'UPDATE departments SET name = ? WHERE id = ? AND organization_id = ?',
+    [trimmed, departmentId, organizationId]
+  )) as { affectedRows?: number };
+
+  if (!result.affectedRows) {
+    throw new Error('Department not found');
+  }
+}
+
+export async function deleteDepartment(
+  departmentId: number,
+  organizationId: number
+): Promise<void> {
+  const cards = await queryOne<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM business_cards WHERE department_id = ?',
+    [departmentId]
+  );
+  if ((cards?.count || 0) > 0) {
+    throw new Error('Cannot delete a department that still has cards. Move the cards first.');
+  }
+
+  const result = (await query(
+    'DELETE FROM departments WHERE id = ? AND organization_id = ?',
+    [departmentId, organizationId]
+  )) as { affectedRows?: number };
+
+  if (!result.affectedRows) {
+    throw new Error('Department not found');
+  }
+}
+
+export async function addUserToDepartment(
+  userId: number,
+  departmentId: number,
+  organizationId: number
+): Promise<void> {
+  const department = await queryOne<{ id: number }>(
+    'SELECT id FROM departments WHERE id = ? AND organization_id = ?',
+    [departmentId, organizationId]
+  );
+  if (!department) {
+    throw new Error('Department not found');
+  }
+
+  const user = await queryOne<{ id: number }>(
+    'SELECT id FROM users WHERE id = ? AND organization_id = ?',
+    [userId, organizationId]
+  );
+  if (!user) {
+    throw new Error('User not found in this organization');
+  }
+
+  await query(
+    'INSERT IGNORE INTO user_departments (user_id, department_id) VALUES (?, ?)',
+    [userId, departmentId]
+  );
+}
+
+export async function removeUserFromDepartment(
+  userId: number,
+  departmentId: number
+): Promise<void> {
+  await query(
+    'DELETE FROM user_departments WHERE user_id = ? AND department_id = ?',
+    [userId, departmentId]
+  );
+}

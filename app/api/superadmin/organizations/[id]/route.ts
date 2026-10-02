@@ -143,7 +143,13 @@ export async function GET(
     }));
 
     const departments = await query(
-      'SELECT id, name FROM departments WHERE organization_id = ? ORDER BY name',
+      `SELECT
+         d.id,
+         d.name,
+         (SELECT COUNT(*) FROM business_cards bc WHERE bc.department_id = d.id) AS card_count
+       FROM departments d
+       WHERE d.organization_id = ?
+       ORDER BY d.name`,
       [organizationId]
     );
 

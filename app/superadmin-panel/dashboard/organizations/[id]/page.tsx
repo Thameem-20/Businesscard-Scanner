@@ -10,6 +10,8 @@ import {
   BarChart3,
   Flag,
   UserCog,
+  Network,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-type Tab = 'overview' | 'reports' | 'users';
+type Tab = 'overview' | 'reports' | 'departments' | 'users';
 
 interface OrgStats {
   total_cards: number;
@@ -71,6 +73,7 @@ interface UserRow {
 interface DepartmentRow {
   id: number;
   name: string;
+  card_count?: number;
 }
 
 type OrgRole = 'admin' | 'manager' | 'user';
@@ -96,6 +99,19 @@ export default function OrganizationDetailPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [renamingDept, setRenamingDept] = useState<DepartmentRow | null>(null);
+  const [renameDeptName, setRenameDeptName] = useState('');
+  const [assigningDept, setAssigningDept] = useState<DepartmentRow | null>(null);
+  const [assignUserId, setAssignUserId] = useState('');
+  const [assignRole, setAssignRole] = useState<OrgRole>('user');
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'user' as OrgRole,
+    departmentIds: [] as number[],
+  });
 
   const [editingOrg, setEditingOrg] = useState(false);
   const [editOrgName, setEditOrgName] = useState('');
@@ -195,6 +211,126 @@ export default function OrganizationDetailPage() {
     }
   };
 
+  const handleRenameDepartment = async () => {
+    if (!renamingDept || !renameDeptName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/superadmin/departments', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: parseInt(orgId),
+          departmentId: renamingDept.id,
+          name: renameDeptName.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setRenamingDept(null);
+      await loadOrg();
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Failed to rename department');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteDepartment = async (department: DepartmentRow) => {
+    if (!confirm(`Delete department "${department.name}"? Users will be unassigned. Cards must be moved first.`)) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/superadmin/departments?organizationId=${orgId}&departmentId=${department.id}`,
+        { method: 'DELETE' }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await loadOrg();
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Failed to delete department');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAssignMember = async () => {
+    if (!assigningDept || !assignUserId) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/superadmin/departments/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: parseInt(orgId),
+          departmentId: assigningDept.id,
+          userId: parseInt(assignUserId),
+          role: assignRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setAssigningDept(null);
+      setAssignUserId('');
+      await loadOrg();
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Failed to assign user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveMember = async (departmentId: number, userId: number) => {
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/superadmin/departments/assign?departmentId=${departmentId}&userId=${userId}`,
+        { method: 'DELETE' }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await loadOrg();
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Failed to remove user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    if (!createUserForm.name.trim() || !createUserForm.email.trim() || !createUserForm.password) {
+      setError('Name, email, and password are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/superadmin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: parseInt(orgId),
+          ...createUserForm,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShowCreateUser(false);
+      setCreateUserForm({
+        name: '',
+        email: '',
+        password: '',
+        role: 'user',
+        departmentIds: [],
+      });
+      await loadOrg();
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Failed to create user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleUpdateUser = async () => {
     if (!editingUser) return;
     setSaving(true);
@@ -235,6 +371,7 @@ export default function OrganizationDetailPage() {
   const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'reports', label: 'Cards & Reports', icon: CreditCard },
+    { id: 'departments', label: 'Departments', icon: Network },
     { id: 'users', label: 'Users', icon: UserCog },
   ];
 
@@ -469,12 +606,125 @@ export default function OrganizationDetailPage() {
         </section>
       )}
 
+      {activeTab === 'departments' && (
+        <section className="space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-white">Create department</h3>
+            <div className="flex gap-2">
+              <Input
+                value={newDepartmentName}
+                onChange={(e) => setNewDepartmentName(e.target.value)}
+                placeholder="e.g. Sales, Main, Operations"
+                className="bg-slate-800 border-slate-600 text-white h-9"
+              />
+              <Button
+                onClick={handleAddDepartment}
+                disabled={saving || !newDepartmentName.trim()}
+                className="bg-amber-500 hover:bg-amber-600 text-slate-950 h-9"
+              >
+                Create
+              </Button>
+            </div>
+          </div>
+
+          {departments.length === 0 && (
+            <p className="text-slate-500 text-sm">No departments yet.</p>
+          )}
+
+          {departments.map((department) => {
+            const members = users.filter((user) => user.department_ids?.includes(department.id));
+            const managers = members.filter((user) => user.role === 'manager');
+            const deptUsers = members.filter((user) => user.role === 'user');
+            const admins = members.filter((user) => user.role === 'admin');
+            return (
+              <div key={department.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-white font-semibold">{department.name}</h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {department.card_count || 0} cards · {managers.length} manager(s) · {deptUsers.length} user(s)
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-700 text-slate-300"
+                      onClick={() => {
+                        setAssigningDept(department);
+                        setAssignUserId('');
+                        setAssignRole('user');
+                      }}
+                    >
+                      Assign person
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-700 text-slate-300"
+                      onClick={() => {
+                        setRenamingDept(department);
+                        setRenameDeptName(department.name);
+                      }}
+                    >
+                      Rename
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-slate-700 text-red-300"
+                      onClick={() => handleDeleteDepartment(department)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-4">
+                  <DeptPeople
+                    title="Managers"
+                    people={managers}
+                    empty="No managers assigned"
+                    onRemove={(userId) => handleRemoveMember(department.id, userId)}
+                    onEdit={openEditUser}
+                  />
+                  <DeptPeople
+                    title="Users"
+                    people={deptUsers}
+                    empty="No users assigned"
+                    onRemove={(userId) => handleRemoveMember(department.id, userId)}
+                    onEdit={openEditUser}
+                  />
+                  <DeptPeople
+                    title="Admins in this department"
+                    people={admins}
+                    empty="No admins assigned"
+                    onRemove={(userId) => handleRemoveMember(department.id, userId)}
+                    onEdit={openEditUser}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
       {activeTab === 'users' && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800 space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold text-white">Users in {orgName}</h3>
-              <p className="text-xs text-slate-500 mt-1">{users.length} user(s)</p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-white">Users in {orgName}</h3>
+                <p className="text-xs text-slate-500 mt-1">{users.length} user(s)</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setShowCreateUser(true)}
+                className="bg-amber-500 hover:bg-amber-600 text-slate-950"
+              >
+                <UserPlus className="w-4 h-4 mr-1" />
+                Add user
+              </Button>
             </div>
             <div className="flex flex-wrap gap-2">
               {departments.map((department) => (
@@ -605,7 +855,9 @@ export default function OrganizationDetailPage() {
       <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>
+              Edit {editingUser?.role === 'admin' ? 'admin' : editingUser?.role === 'manager' ? 'manager' : 'user'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
             <Field label="Name">
@@ -680,6 +932,172 @@ export default function OrganizationDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add user</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Field label="Name">
+              <Input
+                value={createUserForm.name}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, name: e.target.value })}
+                className="bg-slate-800 border-slate-600 text-white"
+              />
+            </Field>
+            <Field label="Email">
+              <Input
+                type="email"
+                value={createUserForm.email}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                className="bg-slate-800 border-slate-600 text-white"
+              />
+            </Field>
+            <Field label="Password">
+              <Input
+                type="password"
+                value={createUserForm.password}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
+                className="bg-slate-800 border-slate-600 text-white"
+              />
+            </Field>
+            <Field label="Role">
+              <select
+                value={createUserForm.role}
+                onChange={(e) => setCreateUserForm({ ...createUserForm, role: e.target.value as OrgRole })}
+                className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-white text-sm"
+              >
+                <option value="user">User — own cards only</option>
+                <option value="manager">Manager — assigned departments</option>
+                <option value="admin">Admin — all cards</option>
+              </select>
+            </Field>
+            <Field label="Departments">
+              <div className="space-y-2 max-h-36 overflow-y-auto border border-slate-700 rounded-md p-3">
+                {departments.map((department) => (
+                  <label key={department.id} className="flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={createUserForm.departmentIds.includes(department.id)}
+                      onChange={() => {
+                        const selected = createUserForm.departmentIds.includes(department.id)
+                          ? createUserForm.departmentIds.filter((id) => id !== department.id)
+                          : [...createUserForm.departmentIds, department.id];
+                        setCreateUserForm({ ...createUserForm, departmentIds: selected });
+                      }}
+                    />
+                    {department.name}
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <Button onClick={handleCreateUser} disabled={saving} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950">
+              {saving ? 'Creating...' : 'Create user'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!renamingDept} onOpenChange={() => setRenamingDept(null)}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Rename department</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              value={renameDeptName}
+              onChange={(e) => setRenameDeptName(e.target.value)}
+              className="bg-slate-800 border-slate-600 text-white"
+            />
+            <Button onClick={handleRenameDepartment} disabled={saving} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950">
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!assigningDept} onOpenChange={() => setAssigningDept(null)}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Assign person to {assigningDept?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Field label="Person">
+              <select
+                value={assignUserId}
+                onChange={(e) => setAssignUserId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-white text-sm"
+              >
+                <option value="">Select user</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.role})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Assign as">
+              <select
+                value={assignRole}
+                onChange={(e) => setAssignRole(e.target.value as OrgRole)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-white text-sm"
+              >
+                <option value="user">User of this department</option>
+                <option value="manager">Manager of this department</option>
+              </select>
+            </Field>
+            <Button onClick={handleAssignMember} disabled={saving || !assignUserId} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950">
+              {saving ? 'Assigning...' : 'Assign'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function DeptPeople({
+  title,
+  people,
+  empty,
+  onRemove,
+  onEdit,
+}: {
+  title: string;
+  people: UserRow[];
+  empty: string;
+  onRemove: (userId: number) => void;
+  onEdit: (user: UserRow) => void;
+}) {
+  return (
+    <div className="bg-slate-800/40 border border-slate-800 rounded-lg p-3">
+      <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">{title}</p>
+      {people.length === 0 ? (
+        <p className="text-xs text-slate-600">{empty}</p>
+      ) : (
+        <div className="space-y-2">
+          {people.map((user) => (
+            <div key={user.id} className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => onEdit(user)}
+                className="text-left min-w-0"
+              >
+                <p className="text-sm text-white truncate">{user.name}</p>
+                <p className="text-xs text-slate-500 truncate">{user.email}</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRemove(user.id)}
+                className="text-xs text-slate-500 hover:text-red-300 flex-shrink-0"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

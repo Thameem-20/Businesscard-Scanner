@@ -13,7 +13,8 @@
     "generate-icons": "node scripts/generate-icons.js",
     "db:migrate-country": "node scripts/migrate-add-country.js",
     "db:migrate-superadmin": "node scripts/migrate-superadmin.js",
-    "db:migrate-departments": "node scripts/migrate-departments.js"
+    "db:migrate-departments": "node scripts/migrate-departments.js",
+    "db:migrate-mfa": "node scripts/migrate-mfa.js"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.32.0",
@@ -33,6 +34,7 @@
     "mysql2": "^3.6.5",
     "next": "14.0.4",
     "next-auth": "^4.24.5",
+    "nodemailer": "^7.0.13",
     "pdfkit": "^0.17.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -46,6 +48,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",

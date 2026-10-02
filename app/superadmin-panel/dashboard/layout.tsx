@@ -13,6 +13,7 @@ import {
   Plus,
   Menu,
   X,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,6 +96,7 @@ export default function SuperAdminDashboardLayout({
 
   const isOrgActive = (orgId: number) => pathname.includes(`/organizations/${orgId}`);
   const isHome = pathname === '/superadmin-panel/dashboard';
+  const isSettings = pathname === '/superadmin-panel/dashboard/settings';
 
   if (status === 'loading') {
     return (
@@ -132,6 +134,19 @@ export default function SuperAdminDashboardLayout({
         >
           <LayoutGrid className="w-4 h-4 flex-shrink-0" />
           All Organizations
+        </Link>
+
+        <Link
+          href="/superadmin-panel/dashboard/settings"
+          onClick={() => setSidebarOpen(false)}
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+            isSettings
+              ? 'bg-amber-500/15 text-amber-400 font-medium'
+              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+          }`}
+        >
+          <Settings className="w-4 h-4 flex-shrink-0" />
+          Settings
         </Link>
 
         <div className="pt-4 pb-2 px-3">
