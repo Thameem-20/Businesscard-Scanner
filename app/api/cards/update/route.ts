@@ -3,17 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { canAccessCard, getAccessContext } from '@/lib/access';
-import { getPrimaryDepartmentId } from '@/lib/departments';
-
-async function getUserScanCountry(userId: number): Promise<string | null> {
-  const users = (await query(
-    'SELECT scan_country FROM users WHERE id = ?',
-    [userId]
-  )) as { scan_country: string | null }[];
-
-  const country = users[0]?.scan_country;
-  return country?.trim() ? country : null;
-}
+import { getEffectiveScanCountry, getPrimaryDepartmentId } from '@/lib/departments';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +18,7 @@ export async function POST(request: NextRequest) {
     const { cardId, cardData, imageUrl, blobName, createNew } = body;
 
     if (createNew && cardData) {
-      const scanCountry = await getUserScanCountry(access.id);
+      const { effectiveCountry } = await getEffectiveScanCountry(access.id);
       const departmentId = await getPrimaryDepartmentId(access.id);
 
       const result = (await query(
@@ -45,7 +35,7 @@ export async function POST(request: NextRequest) {
           cardData.email || null,
           cardData.phone || null,
           cardData.address || null,
-          scanCountry,
+          effectiveCountry,
           cardData.website || null,
           imageUrl || null,
           blobName || null,

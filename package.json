@@ -14,6 +14,7 @@
     "db:migrate-country": "node scripts/migrate-add-country.js",
     "db:migrate-superadmin": "node scripts/migrate-superadmin.js",
     "db:migrate-departments": "node scripts/migrate-departments.js",
+    "db:migrate-department-country": "node scripts/migrate-department-country.js",
     "db:migrate-mfa": "node scripts/migrate-mfa.js"
   },
   "dependencies": {

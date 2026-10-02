@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { COUNTRIES } from '@/lib/countries';
+import { getEffectiveScanCountry } from '@/lib/departments';
 
 export async function GET() {
   try {
@@ -13,13 +14,14 @@ export async function GET() {
     }
 
     const userId = parseInt((session.user as any).id);
-    const users = await query(
-      'SELECT scan_country FROM users WHERE id = ?',
-      [userId]
-    ) as { scan_country: string | null }[];
+    const country = await getEffectiveScanCountry(userId);
 
     return NextResponse.json({
-      scanCountry: users[0]?.scan_country || '',
+      scanCountry: country.scanCountry || '',
+      departmentCountry: country.departmentCountry || '',
+      departmentName: country.departmentName || '',
+      effectiveCountry: country.effectiveCountry || '',
+      source: country.source,
       countries: COUNTRIES,
     });
   } catch (error: any) {
@@ -56,7 +58,16 @@ export async function POST(request: NextRequest) {
       userId,
     ]);
 
-    return NextResponse.json({ success: true, scanCountry });
+    const country = await getEffectiveScanCountry(userId);
+
+    return NextResponse.json({
+      success: true,
+      scanCountry: country.scanCountry || '',
+      departmentCountry: country.departmentCountry || '',
+      departmentName: country.departmentName || '',
+      effectiveCountry: country.effectiveCountry || '',
+      source: country.source,
+    });
   } catch (error: any) {
     console.error('Save scan country error:', error);
     return NextResponse.json(

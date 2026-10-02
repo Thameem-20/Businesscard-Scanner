@@ -69,6 +69,7 @@ async function initDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         organization_id INT NOT NULL,
         name VARCHAR(255) NOT NULL,
+        country VARCHAR(100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY unique_org_dept (organization_id, name),

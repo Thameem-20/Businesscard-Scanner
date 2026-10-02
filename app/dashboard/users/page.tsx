@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CountrySelect } from '@/components/country-select';
 
 interface User {
   id: number;
@@ -29,6 +30,7 @@ interface User {
 interface Department {
   id: number;
   name: string;
+  country?: string | null;
 }
 
 type OrgRole = 'admin' | 'manager' | 'user';
@@ -54,6 +56,8 @@ export default function UsersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [newDepartmentCountry, setNewDepartmentCountry] = useState('');
+  const [editingDepartmentId, setEditingDepartmentId] = useState<number | null>(null);
   const [addingDepartment, setAddingDepartment] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -189,15 +193,24 @@ export default function UsersPage() {
     setAddingDepartment(true);
     setError('');
     try {
-      const response = await fetch('/api/departments/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newDepartmentName.trim() }),
-      });
+      const response = await fetch(
+        editingDepartmentId ? '/api/departments/update' : '/api/departments/create',
+        {
+          method: editingDepartmentId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            departmentId: editingDepartmentId,
+            name: newDepartmentName.trim(),
+            country: newDepartmentCountry.trim() || null,
+          }),
+        }
+      );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to create department');
+      if (!response.ok) throw new Error(data.error || 'Failed to save department');
       setNewDepartmentName('');
-      setSuccess('Department created');
+      setNewDepartmentCountry('');
+      setEditingDepartmentId(null);
+      setSuccess(editingDepartmentId ? 'Department updated' : 'Department created');
       setTimeout(() => setSuccess(''), 3000);
       fetchDepartments();
     } catch (err: any) {
@@ -320,24 +333,61 @@ export default function UsersPage() {
                 <p className="text-sm text-gray-500">No departments yet. Add Sales or another team.</p>
               )}
               {departments.map((department) => (
-                <span
+                <button
                   key={department.id}
-                  className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700"
+                  type="button"
+                  onClick={() => {
+                    setEditingDepartmentId(department.id);
+                    setNewDepartmentName(department.name);
+                    setNewDepartmentCountry(department.country || '');
+                  }}
+                  className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    editingDepartmentId === department.id
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-indigo-50 text-indigo-700'
+                  }`}
                 >
                   {department.name}
-                </span>
+                  {department.country ? ` · ${department.country}` : ''}
+                </button>
               ))}
             </div>
-            <form onSubmit={handleAddDepartment} className="flex gap-2">
+            <form onSubmit={handleAddDepartment} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
               <Input
                 value={newDepartmentName}
                 onChange={(e) => setNewDepartmentName(e.target.value)}
                 placeholder="Add department (e.g. Sales)"
               />
+              <CountrySelect
+                value={newDepartmentCountry}
+                onChange={setNewDepartmentCountry}
+                emptyLabel="Department country"
+              />
               <Button type="submit" disabled={addingDepartment || !newDepartmentName.trim()}>
-                Add
+                {editingDepartmentId ? 'Save' : 'Add'}
               </Button>
             </form>
+            <p className="text-xs text-gray-500 mt-2">
+              New cards scanned by people in this department use its country unless they change it in Settings.
+              {editingDepartmentId ? (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="text-indigo-600 font-medium"
+                    onClick={() => {
+                      setEditingDepartmentId(null);
+                      setNewDepartmentName('');
+                      setNewDepartmentCountry('');
+                    }}
+                  >
+                    Cancel edit
+                  </button>
+                </>
+              ) : (
+                ' Click a department to edit it.'
+              )}
+            </p>
           </div>
         )}
 

@@ -1,21 +1,24 @@
 import { query, queryOne } from './db';
+import { normalizeCountry } from './countries';
 
 export interface Department {
   id: number;
   name: string;
+  country?: string | null;
   created_at?: string;
 }
 
 export async function listDepartments(organizationId: number): Promise<Department[]> {
   return (await query(
-    'SELECT id, name, created_at FROM departments WHERE organization_id = ? ORDER BY name',
+    'SELECT id, name, country, created_at FROM departments WHERE organization_id = ? ORDER BY name',
     [organizationId]
   )) as Department[];
 }
 
 export async function createDepartment(
   organizationId: number,
-  name: string
+  name: string,
+  country?: string | null
 ): Promise<number> {
   const trimmed = name.trim();
   if (!trimmed) {
@@ -23,8 +26,8 @@ export async function createDepartment(
   }
 
   const result = (await query(
-    'INSERT INTO departments (organization_id, name) VALUES (?, ?)',
-    [organizationId, trimmed]
+    'INSERT INTO departments (organization_id, name, country) VALUES (?, ?, ?)',
+    [organizationId, trimmed, normalizeCountry(country)]
   )) as { insertId: number };
 
   return result.insertId;
@@ -43,6 +46,41 @@ export async function getPrimaryDepartmentId(userId: number): Promise<number | n
     [userId]
   )) as { department_id: number } | null;
   return row?.department_id ?? null;
+}
+
+export async function getEffectiveScanCountry(userId: number): Promise<{
+  scanCountry: string | null;
+  departmentCountry: string | null;
+  departmentName: string | null;
+  effectiveCountry: string | null;
+  source: 'user' | 'department' | null;
+}> {
+  const user = (await queryOne(
+    'SELECT scan_country FROM users WHERE id = ?',
+    [userId]
+  )) as { scan_country: string | null } | null;
+
+  const department = (await queryOne(
+    `SELECT d.name, d.country
+     FROM user_departments ud
+     JOIN departments d ON d.id = ud.department_id
+     WHERE ud.user_id = ?
+     ORDER BY ud.department_id ASC
+     LIMIT 1`,
+    [userId]
+  )) as { name: string; country: string | null } | null;
+
+  const scanCountry = user?.scan_country?.trim() || null;
+  const departmentCountry = department?.country?.trim() || null;
+  const effectiveCountry = scanCountry || departmentCountry;
+
+  return {
+    scanCountry,
+    departmentCountry,
+    departmentName: department?.name || null,
+    effectiveCountry,
+    source: scanCountry ? 'user' : departmentCountry ? 'department' : null,
+  };
 }
 
 export async function setUserDepartments(
@@ -92,7 +130,8 @@ export async function setUserDepartments(
 export async function renameDepartment(
   departmentId: number,
   organizationId: number,
-  name: string
+  name: string,
+  country?: string | null
 ): Promise<void> {
   const trimmed = name.trim();
   if (!trimmed) {
@@ -100,8 +139,8 @@ export async function renameDepartment(
   }
 
   const result = (await query(
-    'UPDATE departments SET name = ? WHERE id = ? AND organization_id = ?',
-    [trimmed, departmentId, organizationId]
+    'UPDATE departments SET name = ?, country = ? WHERE id = ? AND organization_id = ?',
+    [trimmed, normalizeCountry(country), departmentId, organizationId]
   )) as { affectedRows?: number };
 
   if (!result.affectedRows) {

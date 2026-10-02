@@ -146,6 +146,7 @@ export async function GET(
       `SELECT
          d.id,
          d.name,
+         d.country,
          (SELECT COUNT(*) FROM business_cards bc WHERE bc.department_id = d.id) AS card_count
        FROM departments d
        WHERE d.organization_id = ?

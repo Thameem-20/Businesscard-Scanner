@@ -3,7 +3,7 @@
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, LogOut, User, Settings } from 'lucide-react';
+import { LogOut, User, Settings } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,27 +28,24 @@ export function DashboardTopbar() {
   const pageTitle = pageTitles[pathname] || 'Dashboard';
 
   return (
-    <header className="fixed md:sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <div className="flex h-16 items-center justify-between px-4 md:px-6">
-        {/* Left side - Logo/Title for mobile, empty on desktop (sidebar has logo) */}
-        <div className="flex items-center space-x-3 md:hidden">
-          <Building2 className="h-6 w-6 text-indigo-600" />
-          <span className="font-bold text-lg text-gray-900">{pageTitle}</span>
+    <header className="fixed md:sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
+        <div className="flex items-center space-x-2 md:hidden">
+          <span className="font-semibold text-[17px] tracking-tight text-slate-900">{pageTitle}</span>
         </div>
         
         <div className="hidden md:flex items-center">
           <h1 className="text-xl font-semibold text-gray-900">{pageTitle}</h1>
         </div>
 
-        {/* Right side - User menu */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center space-x-3 h-10 px-3 hover:bg-gray-100"
+                className="flex items-center space-x-3 h-9 w-9 md:h-10 md:w-auto md:px-3 p-0 hover:bg-gray-100 rounded-full"
               >
-                <div className="hidden sm:flex flex-col items-end">
+                <div className="hidden md:flex flex-col items-end">
                   <span className="text-sm font-medium text-gray-900">
                     {session?.user?.name || 'User'}
                   </span>
@@ -56,8 +53,8 @@ export function DashboardTopbar() {
                     {session?.user?.email}
                   </span>
                 </div>
-                <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <User className="h-5 w-5 text-indigo-600" />
+                <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <User className="h-4 w-4 md:h-5 md:w-5 text-indigo-600" />
                 </div>
               </Button>
             </DropdownMenuTrigger>

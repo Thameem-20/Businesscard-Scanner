@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Lock, Key, AlertCircle, CheckCircle, Download, Globe } from 'lucide-react';
-import { COUNTRIES } from '@/lib/countries';
+import { CountrySelect } from '@/components/country-select';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -27,8 +27,9 @@ export default function SettingsPage() {
   const [integrationsSuccess, setIntegrationsSuccess] = useState('');
   const [exporting, setExporting] = useState(false);
   const [scanCountry, setScanCountry] = useState('');
-  const [countrySelect, setCountrySelect] = useState('');
-  const [customCountry, setCustomCountry] = useState('');
+  const [departmentCountry, setDepartmentCountry] = useState('');
+  const [departmentName, setDepartmentName] = useState('');
+  const [effectiveCountry, setEffectiveCountry] = useState('');
   const [scanCountryLoading, setScanCountryLoading] = useState(true);
   const [scanCountrySaving, setScanCountrySaving] = useState(false);
   const [scanCountrySuccess, setScanCountrySuccess] = useState('');
@@ -41,17 +42,9 @@ export default function SettingsPage() {
       if (response.ok) {
         const saved = data.scanCountry || '';
         setScanCountry(saved);
-
-        if (!saved) {
-          setCountrySelect('');
-          setCustomCountry('');
-        } else if (COUNTRIES.includes(saved as (typeof COUNTRIES)[number])) {
-          setCountrySelect(saved);
-          setCustomCountry('');
-        } else {
-          setCountrySelect('__custom__');
-          setCustomCountry(saved);
-        }
+        setDepartmentCountry(data.departmentCountry || '');
+        setDepartmentName(data.departmentName || '');
+        setEffectiveCountry(data.effectiveCountry || '');
       }
     } catch (err) {
       console.error('Failed to fetch scan country:', err);
@@ -66,14 +59,7 @@ export default function SettingsPage() {
     setScanCountrySuccess('');
     setScanCountryError('');
 
-    const valueToSave =
-      countrySelect === '__custom__' ? customCountry.trim() : countrySelect;
-
-    if (countrySelect === '__custom__' && !valueToSave) {
-      setScanCountryError('Enter a custom country or network name');
-      setScanCountrySaving(false);
-      return;
-    }
+    const valueToSave = scanCountry.trim();
 
     try {
       const response = await fetch('/api/settings/scan-country', {
@@ -87,11 +73,15 @@ export default function SettingsPage() {
         throw new Error(data.error || 'Failed to save scan country');
       }
 
-      setScanCountry(valueToSave);
+      setScanCountry(data.scanCountry || valueToSave);
+      setDepartmentCountry(data.departmentCountry || '');
+      setDepartmentName(data.departmentName || '');
+      setEffectiveCountry(data.effectiveCountry || '');
 
+      const nextCountry = data.effectiveCountry || valueToSave;
       setScanCountrySuccess(
-        valueToSave
-          ? `New cards will be tagged as ${valueToSave}.`
+        nextCountry
+          ? `New cards will be tagged as ${nextCountry}.`
           : 'Scan country cleared. New cards will not be categorized.'
       );
       setTimeout(() => setScanCountrySuccess(''), 4000);
@@ -276,49 +266,37 @@ export default function SettingsPage() {
               Scan Country
             </CardTitle>
             <CardDescription>
-              Set the country or network for new cards you scan (e.g. Saudi Arabia, WCA).
+              New cards use your department country unless you pick a different one here.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSaveScanCountry} className="space-y-4">
+              {departmentCountry && (
+                <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  {departmentName || 'Your department'} default: <strong>{departmentCountry}</strong>
+                  {effectiveCountry && effectiveCountry !== scanCountry
+                    ? `. New cards are tagged as ${effectiveCountry}.`
+                    : '.'}
+                </p>
+              )}
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-2">
                   Country / Network
                 </label>
-                <select
-                  value={countrySelect}
-                  onChange={(e) => setCountrySelect(e.target.value)}
+                <CountrySelect
+                  value={scanCountry}
+                  onChange={setScanCountry}
+                  emptyLabel={
+                    departmentCountry
+                      ? `Use department country (${departmentCountry})`
+                      : 'No country (uncategorized)'
+                  }
                   disabled={scanCountryLoading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-                >
-                  <option value="">No country (uncategorized)</option>
-                  {COUNTRIES.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
-                    </option>
-                  ))}
-                  <option value="__custom__">Custom (enter manually)</option>
-                </select>
+                />
               </div>
 
-              {countrySelect === '__custom__' && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700 block mb-2">
-                    Custom name
-                  </label>
-                  <Input
-                    type="text"
-                    value={customCountry}
-                    onChange={(e) => setCustomCountry(e.target.value)}
-                    placeholder="e.g. WCA, GLN, Saudi Arabia"
-                    maxLength={100}
-                    disabled={scanCountryLoading}
-                  />
-                </div>
-              )}
-
               <p className="text-xs text-gray-500">
-                Change this before scanning when collecting cards from a different country or network.
+                Leave this on the department country for normal scanning. Change it only when you are collecting cards in a different country or network.
               </p>
 
               {scanCountryError && (

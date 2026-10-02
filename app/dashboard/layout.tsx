@@ -43,7 +43,7 @@ export default function DashboardLayout({
         {/* Top Bar */}
         <DashboardTopbar />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-20 md:pb-0 pt-16 md:pt-0 w-full">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-0 pt-14 md:pt-0 w-full bg-slate-50">
           <div className="h-full w-full">
             {children}
           </div>

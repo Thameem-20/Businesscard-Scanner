@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { organizationId, name } = await request.json();
+    const { organizationId, name, country } = await request.json();
     if (!organizationId || !name?.trim()) {
       return NextResponse.json(
         { error: 'Organization ID and department name are required' },
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const departmentId = await createDepartment(organizationId, name);
+    const departmentId = await createDepartment(organizationId, name, country);
     return NextResponse.json({ success: true, departmentId });
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY') {
@@ -66,7 +66,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { organizationId, departmentId, name } = await request.json();
+    const { organizationId, departmentId, name, country } = await request.json();
     if (!organizationId || !departmentId || !name?.trim()) {
       return NextResponse.json(
         { error: 'Organization ID, department ID, and name are required' },
@@ -74,7 +74,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    await renameDepartment(departmentId, organizationId, name);
+    await renameDepartment(departmentId, organizationId, name, country);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY') {

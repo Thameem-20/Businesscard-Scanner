@@ -59,3 +59,12 @@ export const COUNTRIES = [
 ] as const;
 
 export type Country = (typeof COUNTRIES)[number];
+
+export function normalizeCountry(value?: string | null): string | null {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed) return null;
+  if (trimmed.length > 100) {
+    throw new Error('Country or network name must be 100 characters or less');
+  }
+  return trimmed;
+}

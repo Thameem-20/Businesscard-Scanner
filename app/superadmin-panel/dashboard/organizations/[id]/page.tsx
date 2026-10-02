@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CountrySelect } from '@/components/country-select';
 import {
   Dialog,
   DialogContent,
@@ -73,6 +74,7 @@ interface UserRow {
 interface DepartmentRow {
   id: number;
   name: string;
+  country?: string | null;
   card_count?: number;
 }
 
@@ -99,8 +101,10 @@ export default function OrganizationDetailPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [newDepartmentCountry, setNewDepartmentCountry] = useState('');
   const [renamingDept, setRenamingDept] = useState<DepartmentRow | null>(null);
   const [renameDeptName, setRenameDeptName] = useState('');
+  const [renameDeptCountry, setRenameDeptCountry] = useState('');
   const [assigningDept, setAssigningDept] = useState<DepartmentRow | null>(null);
   const [assignUserId, setAssignUserId] = useState('');
   const [assignRole, setAssignRole] = useState<OrgRole>('user');
@@ -198,11 +202,16 @@ export default function OrganizationDetailPage() {
       const res = await fetch('/api/superadmin/departments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId: parseInt(orgId), name: newDepartmentName.trim() }),
+        body: JSON.stringify({
+          organizationId: parseInt(orgId),
+          name: newDepartmentName.trim(),
+          country: newDepartmentCountry.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setNewDepartmentName('');
+      setNewDepartmentCountry('');
       await loadOrg();
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || 'Failed to create department');
@@ -222,6 +231,7 @@ export default function OrganizationDetailPage() {
           organizationId: parseInt(orgId),
           departmentId: renamingDept.id,
           name: renameDeptName.trim(),
+          country: renameDeptCountry.trim() || null,
         }),
       });
       const data = await res.json();
@@ -610,12 +620,18 @@ export default function OrganizationDetailPage() {
         <section className="space-y-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
             <h3 className="text-sm font-semibold text-white">Create department</h3>
-            <div className="flex gap-2">
+            <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
               <Input
                 value={newDepartmentName}
                 onChange={(e) => setNewDepartmentName(e.target.value)}
                 placeholder="e.g. Sales, Main, Operations"
                 className="bg-slate-800 border-slate-600 text-white h-9"
+              />
+              <CountrySelect
+                value={newDepartmentCountry}
+                onChange={setNewDepartmentCountry}
+                emptyLabel="Department country"
+                className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-white text-sm h-9"
               />
               <Button
                 onClick={handleAddDepartment}
@@ -625,6 +641,9 @@ export default function OrganizationDetailPage() {
                 Create
               </Button>
             </div>
+            <p className="text-xs text-slate-500">
+              People in this department tag new cards with this country unless they change it in Settings.
+            </p>
           </div>
 
           {departments.length === 0 && (
@@ -640,7 +659,12 @@ export default function OrganizationDetailPage() {
               <div key={department.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-white font-semibold">{department.name}</h3>
+                    <h3 className="text-white font-semibold">
+                      {department.name}
+                      {department.country ? (
+                        <span className="ml-2 text-sm font-normal text-amber-400">{department.country}</span>
+                      ) : null}
+                    </h3>
                     <p className="text-xs text-slate-500 mt-1">
                       {department.card_count || 0} cards · {managers.length} manager(s) · {deptUsers.length} user(s)
                     </p>
@@ -665,9 +689,10 @@ export default function OrganizationDetailPage() {
                       onClick={() => {
                         setRenamingDept(department);
                         setRenameDeptName(department.name);
+                        setRenameDeptCountry(department.country || '');
                       }}
                     >
-                      Rename
+                      Edit
                     </Button>
                     <Button
                       size="sm"
@@ -730,15 +755,22 @@ export default function OrganizationDetailPage() {
               {departments.map((department) => (
                 <span key={department.id} className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300">
                   {department.name}
+                  {department.country ? ` · ${department.country}` : ''}
                 </span>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
               <Input
                 value={newDepartmentName}
                 onChange={(e) => setNewDepartmentName(e.target.value)}
                 placeholder="Add department"
                 className="bg-slate-800 border-slate-600 text-white h-9"
+              />
+              <CountrySelect
+                value={newDepartmentCountry}
+                onChange={setNewDepartmentCountry}
+                emptyLabel="Department country"
+                className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-white text-sm h-9"
               />
               <Button
                 onClick={handleAddDepartment}
@@ -1002,13 +1034,19 @@ export default function OrganizationDetailPage() {
       <Dialog open={!!renamingDept} onOpenChange={() => setRenamingDept(null)}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white">
           <DialogHeader>
-            <DialogTitle>Rename department</DialogTitle>
+            <DialogTitle>Edit department</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <Input
               value={renameDeptName}
               onChange={(e) => setRenameDeptName(e.target.value)}
               className="bg-slate-800 border-slate-600 text-white"
+            />
+            <CountrySelect
+              value={renameDeptCountry}
+              onChange={setRenameDeptCountry}
+              emptyLabel="Department country"
+              className="w-full bg-slate-800 border border-slate-600 rounded-md px-3 py-2 text-white text-sm"
             />
             <Button onClick={handleRenameDepartment} disabled={saving} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950">
               {saving ? 'Saving...' : 'Save'}

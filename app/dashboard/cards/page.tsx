@@ -3,14 +3,30 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { CreditCard, Search, Edit, Trash2, X, Phone, Mail, Building2, Globe, ChevronRight, Save, User, Briefcase, MapPin, Flag } from 'lucide-react';
+import {
+  CreditCard,
+  Search,
+  Trash2,
+  X,
+  Phone,
+  Mail,
+  Building2,
+  Globe,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  User,
+  Briefcase,
+  MapPin,
+  Flag,
+  SlidersHorizontal,
+  List,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CardImage } from '@/components/card-image';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -32,6 +48,231 @@ interface BusinessCard {
   uploaded_by: string;
 }
 
+function roleSubtitle(role?: string) {
+  if (role === 'admin') return 'All cards in your organization';
+  if (role === 'manager') return 'Cards from your departments';
+  return 'Cards you have scanned';
+}
+
+function cardImageSrc(card: Pick<BusinessCard, 'image_display_url' | 'image_url'>) {
+  return card.image_display_url || card.image_url;
+}
+
+function websiteHref(website?: string) {
+  if (!website) return '';
+  return website.startsWith('http') ? website : `https://${website}`;
+}
+
+type CardsView = 'list' | 'cards';
+const CARDS_VIEW_KEY = 'cards-view';
+
+function ActionButton({
+  href,
+  icon: Icon,
+  label,
+  enabled,
+}: {
+  href?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  enabled: boolean;
+}) {
+  const inner = (
+    <>
+      <span
+        className={`w-12 h-12 rounded-full flex items-center justify-center shadow-sm ${
+          enabled ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-400'
+        }`}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="text-[11px] font-medium text-slate-500">{label}</span>
+    </>
+  );
+
+  if (!enabled || !href) {
+    return (
+      <div className="flex flex-col items-center gap-1.5 opacity-60 pointer-events-none">
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={href}
+      target={href.startsWith('http') ? '_blank' : undefined}
+      rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+      className="flex flex-col items-center gap-1.5 active:scale-95 transition-transform"
+    >
+      {inner}
+    </a>
+  );
+}
+
+function CardPreview({
+  card,
+  onClick,
+}: {
+  card: BusinessCard;
+  onClick: () => void;
+}) {
+  const subtitle = [card.job_title, card.company].filter(Boolean).join(' · ');
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-[22px] border border-slate-200/80 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden active:scale-[0.99] transition-transform"
+    >
+      <div className="relative bg-zinc-900">
+        <CardImage
+          src={cardImageSrc(card)}
+          alt={card.name}
+          className="w-full h-auto max-h-[58vh] md:max-h-80 object-contain mx-auto block"
+          fallbackClassName="w-full h-40 bg-zinc-800 flex items-center justify-center"
+        />
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent pt-16 px-4 pb-3.5">
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-[16px] text-white truncate drop-shadow-sm">{card.name}</h3>
+              <p className="text-[13px] text-white/80 truncate mt-0.5">
+                {subtitle || 'No company'}
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-white/70 flex-shrink-0 mb-0.5" />
+          </div>
+          {(card.country || card.department_name) && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {card.country && (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-white/15 text-white">
+                  {card.country}
+                </span>
+              )}
+              {card.department_name && (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-white/15 text-white">
+                  {card.department_name}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function CardRow({
+  card,
+  onClick,
+}: {
+  card: BusinessCard;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex items-center gap-3 active:bg-slate-50"
+    >
+      <div className="w-[4.75rem] h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
+        <CardImage
+          src={cardImageSrc(card)}
+          alt={card.name}
+          className="w-full h-full object-contain"
+          fallbackClassName="w-full h-full bg-indigo-50 flex items-center justify-center"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-slate-900 truncate">{card.name}</h3>
+        {card.company && <p className="text-sm text-slate-600 truncate">{card.company}</p>}
+        {card.job_title && <p className="text-xs text-slate-500 truncate">{card.job_title}</p>}
+        {(card.country || card.department_name) && (
+          <p className="text-xs text-indigo-600 truncate mt-0.5">
+            {[card.country, card.department_name].filter(Boolean).join(' · ')}
+          </p>
+        )}
+      </div>
+      <ChevronRight className="h-5 w-5 text-slate-300 flex-shrink-0" />
+    </button>
+  );
+}
+
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: CardsView;
+  onChange: (view: CardsView) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-full bg-slate-200/80 p-0.5" role="group" aria-label="Card list view">
+      <button
+        type="button"
+        onClick={() => onChange('list')}
+        className={`h-8 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold ${
+          value === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+        }`}
+        aria-pressed={value === 'list'}
+      >
+        <List className="h-3.5 w-3.5" />
+        List
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('cards')}
+        className={`h-8 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold ${
+          value === 'cards' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+        }`}
+        aria-pressed={value === 'cards'}
+      >
+        <CreditCard className="h-3.5 w-3.5" />
+        Cards
+      </button>
+    </div>
+  );
+}
+
+function InfoRow({
+  icon: Icon,
+  label,
+  children,
+  href,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  children: React.ReactNode;
+  href?: string;
+}) {
+  const body = (
+    <div className="px-4 py-3.5 border-b border-slate-100 last:border-0 flex items-center justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 flex items-center gap-1.5 mb-1">
+          <Icon className="h-3.5 w-3.5" />
+          {label}
+        </label>
+        {children}
+      </div>
+      {href && <ChevronRight className="h-4 w-4 text-slate-300 flex-shrink-0" />}
+    </div>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={href.startsWith('http') ? '_blank' : undefined}
+        rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+        className="block active:bg-slate-50"
+      >
+        {body}
+      </a>
+    );
+  }
+
+  return body;
+}
+
 export default function CardsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -39,6 +280,8 @@ export default function CardsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<CardsView>('list');
   const [selectedCard, setSelectedCard] = useState<BusinessCard | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -54,6 +297,18 @@ export default function CardsPage() {
       fetchCards();
     }
   }, [status, router]);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(CARDS_VIEW_KEY);
+    if (saved === 'list' || saved === 'cards') {
+      setViewMode(saved);
+    }
+  }, []);
+
+  const handleViewChange = (view: CardsView) => {
+    setViewMode(view);
+    window.localStorage.setItem(CARDS_VIEW_KEY, view);
+  };
 
   const fetchCards = async () => {
     try {
@@ -76,13 +331,9 @@ export default function CardsPage() {
     setIsEditing(false);
   };
 
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
-
   const handleSave = async () => {
     if (!selectedCard) return;
-    
+
     setIsSaving(true);
     try {
       const response = await fetch('/api/cards/update', {
@@ -108,11 +359,7 @@ export default function CardsPage() {
 
       await fetchCards();
       setIsEditing(false);
-      // Update selected card with new data
-      const updatedCard = cards.find(c => c.id === selectedCard.id);
-      if (updatedCard) {
-        setSelectedCard({ ...updatedCard, ...editFormData });
-      }
+      setSelectedCard((current) => (current ? { ...current, ...editFormData } : current));
     } catch (error) {
       console.error('Failed to save:', error);
       alert('Failed to save changes');
@@ -123,10 +370,7 @@ export default function CardsPage() {
 
   const handleDelete = async () => {
     if (!selectedCard) return;
-    
-    if (!confirm('Are you sure you want to delete this business card? This action cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Delete this business card? This cannot be undone.')) return;
 
     setIsDeleting(true);
     try {
@@ -151,8 +395,8 @@ export default function CardsPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
       </div>
     );
   }
@@ -179,35 +423,46 @@ export default function CardsPage() {
     new Set(cards.map((card) => card.country).filter(Boolean) as string[])
   ).sort();
 
-  return (
-    <div className="p-4 md:p-6 lg:p-8 h-full w-full">
-      <div className="h-full w-full">
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Business Cards</h1>
-          <p className="text-gray-600">
-            {(session.user as any)?.role === 'admin'
-              ? 'All cards in your organization'
-              : (session.user as any)?.role === 'manager'
-              ? 'Cards from your departments'
-              : 'Cards you have scanned'}
-          </p>
-        </div>
+  const selectedWebsite = websiteHref(selectedCard?.website);
 
-        <div className="mb-6 flex flex-col sm:flex-row gap-3">
+  return (
+    <div className="md:p-6 lg:p-8 w-full">
+      <div className="hidden md:block mb-6">
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">Business Cards</h1>
+        <p className="text-slate-500">{roleSubtitle((session.user as any)?.role)}</p>
+      </div>
+
+      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-md px-4 pt-3 pb-2 md:static md:bg-transparent md:backdrop-blur-none md:px-0 md:pt-0">
+        <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
-              type="text"
-              placeholder="Search cards by name, company, email, or phone..."
+              type="search"
+              placeholder="Search name, company, phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full h-11 pl-10 pr-4 rounded-full bg-white border border-slate-200 text-[15px] shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters((open) => !open)}
+            className={`h-11 w-11 rounded-full border flex items-center justify-center flex-shrink-0 ${
+              countryFilter || showFilters
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-white text-slate-600 border-slate-200'
+            }`}
+            aria-label="Filters"
+          >
+            <SlidersHorizontal size={18} />
+          </button>
+        </div>
+
+        {(showFilters || countryFilter) && (
           <select
             value={countryFilter}
             onChange={(e) => setCountryFilter(e.target.value)}
-            className="w-full sm:w-56 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+            className="mt-2 w-full h-11 px-3 rounded-2xl bg-white border border-slate-200 text-sm"
           >
             <option value="">All countries / networks</option>
             <option value="__uncategorized__">Uncategorized</option>
@@ -217,374 +472,313 @@ export default function CardsPage() {
               </option>
             ))}
           </select>
-        </div>
+        )}
 
+        <div className="mt-2.5 flex items-center justify-between gap-3 md:mt-3">
+          <p className="text-xs font-medium text-slate-400">
+            {filteredCards.length} card{filteredCards.length === 1 ? '' : 's'}
+            {countryFilter ? ' in this filter' : ''}
+          </p>
+          <ViewToggle value={viewMode} onChange={handleViewChange} />
+        </div>
+      </div>
+
+      <div className="px-4 pb-6 md:px-0">
         {filteredCards.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <CreditCard className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchTerm || countryFilter ? 'No cards found' : 'No business cards yet'}
+          <div className="bg-white rounded-3xl border border-slate-200 px-6 py-16 text-center">
+            <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center">
+              <CreditCard className="h-7 w-7 text-indigo-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">
+              {searchTerm || countryFilter ? 'No cards found' : 'No cards yet'}
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-sm text-slate-500">
               {searchTerm || countryFilter
-                ? 'Try adjusting your search or country filter'
-                : 'No business cards found in your organization'}
+                ? 'Try a different search or filter'
+                : 'Scan a card to add it here'}
             </p>
           </div>
+        ) : viewMode === 'list' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 md:gap-3">
+            {filteredCards.map((card) => (
+              <CardRow key={card.id} card={card} onClick={() => handleCardClick(card)} />
+            ))}
+          </div>
         ) : (
-          <>
-            {/* Mobile: Compact List View */}
-            <div className="md:hidden space-y-3">
-              {filteredCards.map((card) => (
-                <div
-                  key={card.id}
-                  onClick={() => handleCardClick(card)}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center gap-4 active:bg-gray-50 cursor-pointer"
-                >
-                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                    <CardImage
-                      src={card.image_display_url || card.image_url}
-                      alt={card.name}
-                      className="w-full h-full object-cover"
-                      fallbackClassName="w-full h-full bg-indigo-100 flex items-center justify-center"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{card.name}</h3>
-                    {card.company && (
-                      <p className="text-sm text-gray-600 truncate">{card.company}</p>
-                    )}
-                    {card.job_title && (
-                      <p className="text-xs text-gray-500 truncate">{card.job_title}</p>
-                    )}
-                    {card.country && (
-                      <p className="text-xs text-indigo-600 truncate">{card.country}</p>
-                    )}
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop: 3 Cards per Row */}
-            <div className="hidden md:grid md:grid-cols-3 gap-4 max-w-7xl mx-auto">
-              {filteredCards.map((card) => (
-                <div
-                  key={card.id}
-                  onClick={() => handleCardClick(card)}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center gap-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                    <CardImage
-                      src={card.image_display_url || card.image_url}
-                      alt={card.name}
-                      className="w-full h-full object-cover"
-                      fallbackClassName="w-full h-full bg-indigo-100 flex items-center justify-center"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{card.name}</h3>
-                    {card.company && (
-                      <p className="text-sm text-gray-600 truncate">{card.company}</p>
-                    )}
-                    {card.job_title && (
-                      <p className="text-xs text-gray-500 truncate">{card.job_title}</p>
-                    )}
-                    {card.country && (
-                      <p className="text-xs text-indigo-600 truncate">{card.country}</p>
-                    )}
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                </div>
-              ))}
-            </div>
-          </>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 md:gap-4">
+            {filteredCards.map((card) => (
+              <CardPreview key={card.id} card={card} onClick={() => handleCardClick(card)} />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-2xl h-[100dvh] md:h-auto md:max-h-[90vh] overflow-hidden p-3 md:p-5 fixed top-0 left-0 md:left-[50%] md:top-[50%] translate-x-0 md:translate-x-[-50%] translate-y-0 md:translate-y-[-50%] rounded-none md:rounded-xl w-full flex flex-col">
-          <DialogHeader className="pr-8 md:pr-0 pb-2 flex-shrink-0">
-            <div className="flex items-center justify-between gap-4">
-              <DialogTitle className="text-base font-semibold">Card Details</DialogTitle>
-              <div className="flex items-center gap-1">
-                {!isEditing ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleEdit}
-                    className="h-8 w-8"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditFormData(selectedCard || {});
-                    }}
-                    className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
+        <DialogContent
+          hideCloseButton
+          className="max-w-2xl h-[100dvh] md:h-auto md:max-h-[90vh] overflow-hidden p-0 fixed inset-0 md:inset-auto md:left-[50%] md:top-[50%] translate-x-0 md:translate-x-[-50%] translate-y-0 md:translate-y-[-50%] rounded-none md:rounded-2xl w-full flex flex-col bg-[#f2f2f7] gap-0"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Card details</DialogTitle>
           </DialogHeader>
 
           {selectedCard && (
-            <div className="flex flex-col flex-1 min-h-0 gap-2">
-              {/* Card Image */}
-              {selectedCard.image_url && (
-                <div 
-                  className="w-full h-56 md:h-60 bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-95 transition-opacity border border-gray-200 flex-shrink-0"
-                  onClick={() => setIsImageViewerOpen(true)}
+            <div className="flex flex-col flex-1 min-h-0">
+              <div
+                className="flex items-center justify-between px-2 h-12 bg-[#f2f2f7]/95 backdrop-blur-md flex-shrink-0"
+                style={{ paddingTop: 'env(safe-area-inset-top)', minHeight: '3rem' }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEditing) {
+                      setIsEditing(false);
+                      setEditFormData(selectedCard);
+                    } else {
+                      setIsDetailOpen(false);
+                    }
+                  }}
+                  className="text-indigo-600 text-[16px] font-medium px-2 h-10 inline-flex items-center gap-0.5"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                  {isEditing ? 'Cancel' : 'Cards'}
+                </button>
+                <p className="font-semibold text-slate-900 text-[16px]">
+                  {isEditing ? 'Edit' : 'Contact'}
+                </p>
+                {!isEditing ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="text-indigo-600 text-[16px] font-medium px-3 h-10 inline-flex items-center"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <span className="w-16" />
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => cardImageSrc(selectedCard) && setIsImageViewerOpen(true)}
+                  className="w-full bg-zinc-900"
                 >
                   <CardImage
-                    src={selectedCard.image_display_url || selectedCard.image_url}
+                    src={cardImageSrc(selectedCard)}
                     alt={selectedCard.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-auto object-contain mx-auto"
+                    fallbackClassName="w-full h-48 bg-zinc-800 flex items-center justify-center"
                   />
-                </div>
-              )}
+                </button>
 
-              {/* Contact Info - Single Column */}
-              <div className="space-y-2 flex-1 overflow-y-auto">
-                {/* Name */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <User className="h-3 w-3" />
-                    Name
-                  </label>
+                <div className="px-5 pt-5 pb-3 text-center">
                   {isEditing ? (
                     <input
-                      type="text"
                       value={editFormData.name || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                      className="w-full text-center text-xl font-bold border border-slate-200 rounded-xl px-3 py-2 bg-white"
                     />
                   ) : (
-                    <p className="text-sm font-medium text-gray-900 truncate">{selectedCard.name || 'N/A'}</p>
+                    <h2 className="text-[28px] font-bold text-slate-900 leading-tight tracking-tight">
+                      {selectedCard.name}
+                    </h2>
+                  )}
+                  {!isEditing && (
+                    <p className="text-slate-500 mt-1 text-[15px]">
+                      {[selectedCard.job_title, selectedCard.company].filter(Boolean).join(' · ') || '—'}
+                    </p>
                   )}
                 </div>
 
-                {/* Company */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <Building2 className="h-3 w-3" />
-                    Company
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editFormData.company || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                {!isEditing && (
+                  <div className="flex justify-center gap-5 px-4 pb-5">
+                    <ActionButton
+                      href={selectedCard.phone ? `tel:${selectedCard.phone}` : undefined}
+                      icon={Phone}
+                      label="Call"
+                      enabled={Boolean(selectedCard.phone)}
                     />
-                  ) : (
-                    <p className="text-sm text-gray-900 truncate">{selectedCard.company || 'N/A'}</p>
-                  )}
-                </div>
-
-                {/* Job Title */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <Briefcase className="h-3 w-3" />
-                    Title
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editFormData.job_title || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, job_title: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                    <ActionButton
+                      href={selectedCard.email ? `mailto:${selectedCard.email}` : undefined}
+                      icon={Mail}
+                      label="Email"
+                      enabled={Boolean(selectedCard.email)}
                     />
-                  ) : (
-                    <p className="text-sm text-gray-900 truncate">{selectedCard.job_title || 'N/A'}</p>
-                  )}
-                </div>
-
-                {/* Phone */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <Phone className="h-3 w-3" />
-                    Phone
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      value={editFormData.phone || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                    <ActionButton
+                      href={
+                        selectedCard.address
+                          ? `https://maps.google.com/?q=${encodeURIComponent(selectedCard.address)}`
+                          : undefined
+                      }
+                      icon={MapPin}
+                      label="Map"
+                      enabled={Boolean(selectedCard.address)}
                     />
-                  ) : selectedCard.phone ? (
-                    <a href={`tel:${selectedCard.phone}`} className="text-sm no-underline flex items-center justify-between" style={{ color: '#111827' }}>
-                      <span className="truncate">{selectedCard.phone}</span>
-                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400" />
-                    </a>
-                  ) : (
-                    <p className="text-sm text-gray-900">N/A</p>
-                  )}
-                </div>
-
-                {/* Email */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <Mail className="h-3 w-3" />
-                    Email
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      value={editFormData.email || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                    <ActionButton
+                      href={selectedWebsite || undefined}
+                      icon={Globe}
+                      label="Web"
+                      enabled={Boolean(selectedWebsite)}
                     />
-                  ) : selectedCard.email ? (
-                    <a href={`mailto:${selectedCard.email}`} className="text-sm no-underline flex items-center justify-between" style={{ color: '#111827' }}>
-                      <span className="truncate">{selectedCard.email}</span>
-                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400" />
-                    </a>
-                  ) : (
-                    <p className="text-sm text-gray-900">N/A</p>
-                  )}
-                </div>
-
-                {/* Address */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <MapPin className="h-3 w-3" />
-                    Address
-                  </label>
-                  {isEditing ? (
-                    <textarea
-                      value={editFormData.address || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                      rows={2}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white resize-none"
-                    />
-                  ) : selectedCard.address ? (
-                    <a
-                      href={`https://maps.google.com/?q=${encodeURIComponent(selectedCard.address)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm no-underline flex items-start justify-between gap-2"
-                      style={{ color: '#111827' }}
-                    >
-                      <span className="whitespace-pre-wrap">{selectedCard.address}</span>
-                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400 mt-0.5" />
-                    </a>
-                  ) : (
-                    <p className="text-sm text-gray-900">N/A</p>
-                  )}
-                </div>
-
-                {/* Country */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <Flag className="h-3 w-3" />
-                    Country
-                  </label>
-                  <p className="text-sm text-gray-900">{selectedCard.country || 'Uncategorized'}</p>
-                </div>
-
-                {selectedCard.department_name && (
-                  <div className="bg-gray-50 rounded-lg p-2.5">
-                    <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                      <Building2 className="h-3 w-3" />
-                      Department
-                    </label>
-                    <p className="text-sm text-gray-900">{selectedCard.department_name}</p>
                   </div>
                 )}
 
-                {/* Website */}
-                <div className="bg-gray-50 rounded-lg p-2.5">
-                  <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-0.5">
-                    <Globe className="h-3 w-3" />
-                    Website
-                  </label>
+                <div className="mx-4 mb-4 bg-white rounded-[18px] overflow-hidden">
+                  {isEditing && (
+                    <>
+                      <InfoRow icon={Building2} label="Company">
+                        <input
+                          value={editFormData.company || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, company: e.target.value })}
+                          className="w-full text-[15px] border border-slate-200 rounded-lg px-3 py-2"
+                        />
+                      </InfoRow>
+                      <InfoRow icon={Briefcase} label="Title">
+                        <input
+                          value={editFormData.job_title || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, job_title: e.target.value })}
+                          className="w-full text-[15px] border border-slate-200 rounded-lg px-3 py-2"
+                        />
+                      </InfoRow>
+                    </>
+                  )}
+                  <InfoRow
+                    icon={Phone}
+                    label="Phone"
+                    href={!isEditing && selectedCard.phone ? `tel:${selectedCard.phone}` : undefined}
+                  >
+                    {isEditing ? (
+                      <input
+                        type="tel"
+                        value={editFormData.phone || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                        className="w-full text-[15px] border border-slate-200 rounded-lg px-3 py-2"
+                      />
+                    ) : (
+                      <p className="text-[17px] text-slate-900">{selectedCard.phone || '—'}</p>
+                    )}
+                  </InfoRow>
+                  <InfoRow
+                    icon={Mail}
+                    label="Email"
+                    href={!isEditing && selectedCard.email ? `mailto:${selectedCard.email}` : undefined}
+                  >
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={editFormData.email || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                        className="w-full text-[15px] border border-slate-200 rounded-lg px-3 py-2"
+                      />
+                    ) : (
+                      <p className="text-[17px] text-slate-900 break-all">
+                        {selectedCard.email || '—'}
+                      </p>
+                    )}
+                  </InfoRow>
+                  <InfoRow
+                    icon={MapPin}
+                    label="Address"
+                    href={
+                      !isEditing && selectedCard.address
+                        ? `https://maps.google.com/?q=${encodeURIComponent(selectedCard.address)}`
+                        : undefined
+                    }
+                  >
+                    {isEditing ? (
+                      <textarea
+                        value={editFormData.address || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                        rows={2}
+                        className="w-full text-[15px] border border-slate-200 rounded-lg px-3 py-2 resize-none"
+                      />
+                    ) : (
+                      <p className="text-[17px] text-slate-900 whitespace-pre-wrap">
+                        {selectedCard.address || '—'}
+                      </p>
+                    )}
+                  </InfoRow>
+                  <InfoRow
+                    icon={Globe}
+                    label="Website"
+                    href={!isEditing ? selectedWebsite || undefined : undefined}
+                  >
+                    {isEditing ? (
+                      <input
+                        value={editFormData.website || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
+                        className="w-full text-[15px] border border-slate-200 rounded-lg px-3 py-2"
+                      />
+                    ) : (
+                      <p className="text-[17px] text-indigo-600 break-all">
+                        {selectedCard.website || '—'}
+                      </p>
+                    )}
+                  </InfoRow>
+                  <InfoRow icon={Flag} label="Country / network">
+                    <p className="text-[17px] text-slate-900">
+                      {selectedCard.country || 'Uncategorized'}
+                    </p>
+                  </InfoRow>
+                  {selectedCard.department_name && (
+                    <InfoRow icon={Building2} label="Department">
+                      <p className="text-[17px] text-slate-900">{selectedCard.department_name}</p>
+                    </InfoRow>
+                  )}
+                  <InfoRow icon={User} label="Added by">
+                    <p className="text-[17px] text-slate-900">
+                      {selectedCard.uploaded_by} · {new Date(selectedCard.created_at).toLocaleDateString()}
+                    </p>
+                  </InfoRow>
+                </div>
+
+                <div className="px-4 pb-10 space-y-2">
                   {isEditing ? (
-                    <input
-                      type="url"
-                      value={editFormData.website || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-                    />
-                  ) : selectedCard.website ? (
-                    <a 
-                      href={selectedCard.website.startsWith('http') ? selectedCard.website : `https://${selectedCard.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm no-underline flex items-center justify-between"
-                      style={{ color: '#111827' }}
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="w-full h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-[16px]"
                     >
-                      <span className="truncate">{selectedCard.website}</span>
-                      <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400" />
-                    </a>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSaving ? 'Saving...' : 'Save changes'}
+                    </Button>
                   ) : (
-                    <p className="text-sm text-gray-900">N/A</p>
+                    <Button
+                      variant="outline"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="w-full h-12 rounded-2xl border-0 bg-white text-red-600 hover:bg-red-50 text-[16px]"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {isDeleting ? 'Deleting...' : 'Delete card'}
+                    </Button>
                   )}
                 </div>
-              </div>
-
-              {/* Footer - pushed to bottom */}
-              <div className="mt-auto flex-shrink-0 space-y-2" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                {/* Save Button (Edit Mode) */}
-                {isEditing && (
-                  <Button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="w-full h-10 bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                )}
-
-                {/* Footer Info */}
-                <div className="flex items-center justify-between text-[10px] text-gray-400 px-1">
-                  <span>Added by {selectedCard.uploaded_by}</span>
-                  <span>{new Date(selectedCard.created_at).toLocaleDateString()}</span>
-                </div>
-
-                {/* Delete Button */}
-                {!isEditing && (
-                  <Button
-                    variant="outline"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="w-full h-10 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {isDeleting ? 'Deleting...' : 'Delete Card'}
-                  </Button>
-                )}
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Full Image Viewer Modal */}
-      {selectedCard?.image_url && (
+      {selectedCard && cardImageSrc(selectedCard) && (
         <Dialog open={isImageViewerOpen} onOpenChange={setIsImageViewerOpen}>
-          <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
-            <div className="relative w-full h-[95vh] flex items-center justify-center p-4">
+          <DialogContent
+            hideCloseButton
+            className="max-w-[100vw] max-h-[100dvh] h-[100dvh] p-0 bg-black border-none rounded-none"
+          >
+            <div className="relative w-full h-full flex items-center justify-center p-4">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsImageViewerOpen(false)}
-                className="absolute top-4 right-4 z-50 bg-white/90 hover:bg-white text-gray-900 rounded-full h-10 w-10 md:h-12 md:w-12"
+                className="absolute top-4 right-4 z-50 bg-white/90 hover:bg-white text-slate-900 rounded-full h-10 w-10"
               >
-                <X className="h-5 w-5 md:h-6 md:w-6" />
-                <span className="sr-only">Close</span>
+                <X className="h-5 w-5" />
               </Button>
               <CardImage
-                src={selectedCard.image_display_url || selectedCard.image_url}
+                src={cardImageSrc(selectedCard)}
                 alt={selectedCard.name}
                 className="max-w-full max-h-full object-contain"
               />
