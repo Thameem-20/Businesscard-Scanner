@@ -300,7 +300,9 @@ export default function UsersPage() {
 
   if (!session) return null;
 
-  const isAdmin = (session.user as any)?.role === 'admin';
+  const role = (session.user as any)?.role;
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
 
   return (
     <div className="p-4 md:p-6 lg:p-8 h-full w-full">
@@ -311,7 +313,9 @@ export default function UsersPage() {
             <p className="text-gray-600">
               {isAdmin
                 ? 'Manage roles and departments in your organization'
-                : 'View users in your organization'}
+                : isManager
+                  ? 'People in your departments'
+                  : 'People in your department'}
             </p>
           </div>
           {isAdmin && (

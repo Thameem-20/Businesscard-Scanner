@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { query } from '@/lib/db';
-import { getAccessContext } from '@/lib/access';
+import { getAccessContext, userVisibilityClause } from '@/lib/access';
 
 export async function GET() {
   try {
@@ -13,6 +13,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const visibility = userVisibilityClause(access);
     const users = (await query(
       `SELECT
          u.id,
@@ -26,10 +27,10 @@ export async function GET() {
        FROM users u
        LEFT JOIN user_departments ud ON ud.user_id = u.id
        LEFT JOIN departments d ON d.id = ud.department_id
-       WHERE u.organization_id = ?
+       WHERE ${visibility.sql}
        GROUP BY u.id, u.email, u.name, u.role, u.is_active, u.created_at
        ORDER BY u.created_at DESC`,
-      [access.organizationId]
+      visibility.params
     )) as any[];
 
     return NextResponse.json({

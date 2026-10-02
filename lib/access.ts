@@ -103,3 +103,38 @@ export async function canAccessCard(
 export function isOrgAdmin(access: AccessContext): boolean {
   return access.role === 'admin' && access.organizationId != null;
 }
+
+export function userVisibilityClause(
+  access: AccessContext,
+  alias = 'u'
+): { sql: string; params: unknown[] } {
+  if (access.role === 'superadmin') {
+    return { sql: '1 = 1', params: [] };
+  }
+
+  if (!access.organizationId) {
+    return { sql: '1 = 0', params: [] };
+  }
+
+  if (access.role === 'admin') {
+    return { sql: `${alias}.organization_id = ?`, params: [access.organizationId] };
+  }
+
+  if (access.departmentIds.length === 0) {
+    return {
+      sql: `${alias}.organization_id = ? AND ${alias}.id = ?`,
+      params: [access.organizationId, access.id],
+    };
+  }
+
+  const placeholders = access.departmentIds.map(() => '?').join(', ');
+  return {
+    sql: `${alias}.organization_id = ?
+      AND ${alias}.id IN (
+        SELECT udv.user_id
+        FROM user_departments udv
+        WHERE udv.department_id IN (${placeholders})
+      )`,
+    params: [access.organizationId, ...access.departmentIds],
+  };
+}
